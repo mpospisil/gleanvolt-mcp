@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Gleanvolt.Mcp</RootNamespace>
+
+    <!--
+      A stdio server's stdout IS the protocol stream. The SDK writes the framing there and nothing
+      else may: no launch profile banner, no build chatter from a `dotnet run` wrapper.
+    -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+
+  <!--
+    Everything here is internal: this assembly is an executable, not a library, and nothing outside it
+    has any business referencing a tool class. The suite is the one exception.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Mcp.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
+    <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+  </ItemGroup>
+
+</Project>

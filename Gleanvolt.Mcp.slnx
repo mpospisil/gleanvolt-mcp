@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Gleanvolt.Mcp/Gleanvolt.Mcp.csproj" />
+  <Project Path="tests/Gleanvolt.Mcp.Tests/Gleanvolt.Mcp.Tests.csproj" />
+</Solution>
