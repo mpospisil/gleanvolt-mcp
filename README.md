@@ -42,16 +42,40 @@ committed.
 
 ## Running it
 
-You need an installation with the API switched on. In the controller's `.env`:
+You need an installation with the API switched on, and a key.
+
+The key's **name** is not a credential and is never sent — it is what reaches the log and the recorded
+charging session as the source of an action, so a key named `claude-mcp` produces *"API (claude-mcp)
+started Targeted"* rather than an anonymous write. Give this server its own key rather than sharing
+one, or the attribution buys you nothing.
+
+**Running the controller directly**, both halves live in `.env`:
 
 ```bash
 Api__Enabled=true
 Api__Keys__claude-mcp=$(openssl rand -hex 32)
 ```
 
-The key's **name** is not a credential — it is what reaches the log and the recorded charging session
-as the source of an action, so `claude-mcp` produces *"API (claude-mcp) started Targeted"* rather than
-an anonymous write. Give this server its own key rather than sharing one.
+**Running it under the shipped `docker-compose.yml`**, the name is fixed in the compose file and only
+the secret comes from `.env` — so an out-of-the-box deployment has exactly one key, named `client`:
+
+```yaml
+Api__Enabled: ${API_ENABLED:-false}
+Api__Keys__client: ${API_KEY:-}
+```
+
+```bash
+API_ENABLED=true
+API_KEY=<the secret>
+```
+
+To name a key after this server, add a line to the compose service and give it its own variable:
+
+```yaml
+Api__Keys__claude-mcp: ${MCP_API_KEY:-}
+```
+
+Either way, `GLEANVOLT_API_KEY` below is the **secret**, never the name.
 
 Then publish this server and register it:
 
@@ -59,7 +83,7 @@ Then publish this server and register it:
 dotnet publish src/Gleanvolt.Mcp -c Release
 
 claude mcp add gleanvolt \
-  -e GLEANVOLT_URL=http://gleanvolt.local:8090 \
+  -e GLEANVOLT_URL=http://<the installation>:8090 \
   -e GLEANVOLT_API_KEY=<the key> \
   -- src/Gleanvolt.Mcp/bin/Release/net10.0/publish/Gleanvolt.Mcp
 ```
@@ -69,7 +93,7 @@ client starts a server.
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `GLEANVOLT_URL` | yes | Base address of the installation, e.g. `http://gleanvolt.local:8090` |
+| `GLEANVOLT_URL` | yes | Base address of the installation, e.g. `http://gleanvolt.local:8090` — use the IP if mDNS does not resolve from the client machine |
 | `GLEANVOLT_API_KEY` | yes | One of the installation's `Api:Keys` |
 | `GLEANVOLT_MCP_ALLOW_WRITES` | no | `true` registers the four control tools. Anything else leaves this server read-only |
 
