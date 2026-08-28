@@ -106,6 +106,42 @@ Four of these tools move real hardware. Left alone, they are not registered at a
 told they exist, which is a better answer than a tool that always refuses. Enable them deliberately,
 per client, and only where a person is watching the conversation.
 
+An MCP client hands a stdio server the environment it was registered with and nothing else, so the
+switch belongs on the registration rather than in the shell you type it from:
+
+```bash
+claude mcp add gleanvolt \
+  -e GLEANVOLT_URL=http://<the installation>:8090 \
+  -e GLEANVOLT_API_KEY=<the key> \
+  -e GLEANVOLT_MCP_ALLOW_WRITES=true \
+  -- src/Gleanvolt.Mcp/bin/Release/net10.0/publish/Gleanvolt.Mcp
+```
+
+A registration is not edited in place: `claude mcp remove gleanvolt` first, then add it again with the
+variable. And the tool list is built once, at launch, so the client has to start the server afresh —
+changing the variable under a running server changes nothing it has already advertised.
+
+The value is matched against `true`, case-insensitively, and against nothing else. `TRUE` and `True`
+count; `1`, `yes` and `on` do not, and anything unset or unrecognised leaves the server read-only.
+One spelling rather than a family of them is deliberate: a typo should leave the hardware alone.
+
+Nothing more is needed on the installation. The `Api__Enabled=true` and the key from above are what a
+write uses too — this server sends the one key on every call — so the name you gave that key is what
+lands in the charging session as the source of the action.
+
+To confirm which mode it came up in, read the server's first line on stderr:
+
+```
+Serving http://gleanvolt.local:8090/ as 13 tools; writes are ENABLED.
+```
+
+Nine tools and `disabled` means the variable never reached the process. From the client side, `/mcp`
+in Claude Code lists the tools it was actually given: the four control tools are there or they are not.
+
+A read-only server also says so in its own words. The `instructions` it sends at initialize name this
+variable, so a model asked to start a charge it has no tool for reports what is actually wrong and who
+can change it, instead of saying it does not know how.
+
 `gleanvolt_set_battery_hold` does one thing beyond passing the call through: it reads the inverter back
 a few seconds after the write and returns what it saw. A 200 means the register was written, not that
 the inverter honoured it, and the tool's description tells the model to report the read-back rather
