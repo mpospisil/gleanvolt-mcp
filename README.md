@@ -85,11 +85,17 @@ dotnet publish src/Gleanvolt.Mcp -c Release
 claude mcp add gleanvolt \
   -e GLEANVOLT_URL=http://<the installation>:8090 \
   -e GLEANVOLT_API_KEY=<the key> \
-  -- src/Gleanvolt.Mcp/bin/Release/net10.0/publish/Gleanvolt.Mcp
+  -- /path/to/gleanvolt-mcp/src/Gleanvolt.Mcp/bin/Release/net10.0/linux-x64/publish/Gleanvolt.Mcp
 ```
 
 Point it at the published binary rather than at `dotnet run`, which re-checks the build every time the
 client starts a server.
+
+Two things about that path. It carries a runtime identifier because the build publishes single-file,
+and that pins it to one — `linux-x64` above, `osx-arm64` or `win-x64` elsewhere; `dotnet publish`
+prints the directory it wrote, so read it there rather than guessing. And it is absolute because the
+client launches the server from its own working directory, not from this repository — a relative path
+resolves only by luck, and when it does not, the client drops the server without saying why.
 
 | Variable | Required | Meaning |
 |---|---|---|
