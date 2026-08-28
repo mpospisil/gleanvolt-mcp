@@ -39,7 +39,14 @@ builder.Services.AddHttpClient<GleanvoltClient>(http =>
 });
 
 var mcp = builder.Services
-    .AddMcpServer(server => server.ServerInfo = new() { Name = "gleanvolt", Version = "0.1.0" })
+    .AddMcpServer(server =>
+    {
+        server.ServerInfo = new() { Name = "gleanvolt", Version = "0.1.0" };
+
+        // What the client is told at initialize, and the only place a read-only server can explain
+        // itself: the tools it would have refused with are not there to carry the explanation.
+        server.ServerInstructions = ServerInstructions.For(options.AllowWrites);
+    })
     .WithStdioServerTransport()
     // The type-list overload rather than WithTools<T>(): these tool classes are static, and a static
     // type cannot be a type argument.
