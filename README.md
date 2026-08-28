@@ -114,7 +114,7 @@ claude mcp add gleanvolt \
   -e GLEANVOLT_URL=http://<the installation>:8090 \
   -e GLEANVOLT_API_KEY=<the key> \
   -e GLEANVOLT_MCP_ALLOW_WRITES=true \
-  -- src/Gleanvolt.Mcp/bin/Release/net10.0/publish/Gleanvolt.Mcp
+  -- <the published binary, exactly as above>
 ```
 
 A registration is not edited in place: `claude mcp remove gleanvolt` first, then add it again with the
