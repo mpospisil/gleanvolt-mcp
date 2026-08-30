@@ -1,0 +1,15 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      The placeholder a local build is honestly labelled with. CI overrides it with the git tag
+      (Dockerfile's VERSION argument, or -p:Version on a plain publish), so a binary that says
+      0.0.0-dev is one somebody built themselves rather than anything published.
+
+      MSBuild's own default is 1.0.0, which is why this file exists: an unstamped build would
+      otherwise claim a release number it has no relationship to.
+    -->
+    <Version>0.0.0-dev</Version>
+  </PropertyGroup>
+
+</Project>

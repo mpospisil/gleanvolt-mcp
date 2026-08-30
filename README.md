@@ -146,7 +146,7 @@ lands in the charging session as the source of the action.
 To confirm which mode it came up in, read the server's first line on stderr:
 
 ```
-Serving http://gleanvolt.local:8090/ as 13 tools over stdio; writes are ENABLED.
+Gleanvolt MCP 1.0.0 (31bf347) serving http://gleanvolt.local:8090/ as 13 tools over stdio; writes are ENABLED.
 ```
 
 Nine tools and `disabled` means the variable never reached the process. From the client side, `/mcp`
@@ -172,26 +172,30 @@ needs. It is a client that points at a URL and cannot spawn anything, so somethi
 before it can be configured at all.
 
 ```bash
-docker build -t gleanvolt-mcp .
-
 docker run -d --name gleanvolt-mcp --restart unless-stopped -p 8091:8091 \
   -e GLEANVOLT_URL=http://<the installation>:8090 \
   -e GLEANVOLT_API_KEY=<the key> \
-  gleanvolt-mcp
+  ghcr.io/mpospisil/gleanvolt-mcp:latest
 ```
+
+Nothing is built here. That tag is a multi-platform manifest list, so the same name pulls the right
+image on a Pi, an x64 server or a Windows host — see [Container images](#container-images).
 
 The image sets `GLEANVOLT_MCP_TRANSPORT=http` itself — nothing is attached to its stdin, so no other
-mode would work — and runs as a non-root user. Confirm it came up on the address you expect:
+mode would work — and runs as a non-root user. Confirm it came up on the address you expect, and on
+the build you expect:
 
 ```
-Serving http://gleanvolt.local:8090/ as 9 tools at http://0.0.0.0:8091/mcp; writes are disabled.
+Gleanvolt MCP 1.0.0 (31bf347) serving http://gleanvolt.local:8090/ as 9 tools at http://0.0.0.0:8091/mcp; writes are disabled.
 ```
+
+A version of `0.0.0-dev` with no commit means a local build rather than anything CI published.
 
 As a service alongside Home Assistant in the same compose stack:
 
 ```yaml
   gleanvolt-mcp:
-    build: https://github.com/mpospisil/gleanvolt-mcp.git
+    image: ghcr.io/mpospisil/gleanvolt-mcp:latest
     restart: unless-stopped
     environment:
       GLEANVOLT_URL: http://<the installation>:8090
@@ -202,10 +206,6 @@ As a service alongside Home Assistant in the same compose stack:
     expose:
       - 8091
 ```
-
-The first build pulls the .NET SDK image and compiles from source, which on a Pi takes several minutes;
-after that it is cached. Build it once on a faster machine and push the image to a registry if you would
-rather not.
 
 Then in Home Assistant, **Settings → Devices & services → Add integration → Model Context Protocol**,
 and give it the URL:
@@ -254,6 +254,183 @@ The server is stateless: no session is kept between requests, which is what Home
 opening a connection per tool call and closing it again actually wants. Only the Streamable HTTP
 endpoint is mapped — the legacy `/sse` and `/message` pair is off, and Home Assistant tries Streamable
 HTTP first.
+
+## Container images
+
+[`publish-image.yml`](.github/workflows/publish-image.yml) builds this server for three platforms and
+pushes them to GHCR on every push to `main` and every `v*` tag. The point is that **you never build on
+the target machine**: on a Raspberry Pi a local build means pulling the .NET SDK image and compiling
+from source, which is slow enough to be worth avoiding once and for all.
+
+```
+ghcr.io/mpospisil/gleanvolt-mcp
+```
+
+One name covers every platform. That is a **multi-platform manifest list**, so the same tag resolves to
+the correct image on a Raspberry Pi, an x64 Linux server or a Windows host — you name a version, never
+an architecture.
+
+| Tag | What it is | Use it for |
+|---|---|---|
+| `:latest` | Manifest list, built from `main` | Tracking development |
+| `:1.0.0` `:1.0` `:1` | Manifest list, from a `v*` release tag | Normal use |
+| `:sha-abc1234` | Manifest list, every build | Rollback to a known-good build |
+| `:<version>-linux-arm64` | Single platform | Pinning one architecture |
+| `:<version>-linux-amd64` | Single platform | Pinning one architecture |
+| `:<version>-nanoserver-ltsc2022` | Single platform | Pinning the Windows image |
+
+Prefer a manifest-list tag. Reach for a platform-suffixed one only when you deliberately want to stop a
+host resolving its own architecture.
+
+### Running it on a Raspberry Pi
+
+The case these images exist for: the Pi already runs a Gleanvolt installation deployed the way the
+[Gleanvolt wiki](https://github.com/mpospisil/gleanvolt/wiki/Deployment) describes — a Compose project
+in `/opt/solax`, the controller on `:8090` — and you want this server alongside it, so Home Assistant
+or Claude can read the site and, if you let them, move the charger.
+
+**First, give the installation a key of its own.** Nothing below works without it, and the API is off
+by default. The shipped `docker-compose.yml` wires exactly one key, named `client`, whose secret comes
+from `/opt/solax/.env`:
+
+```bash
+# /opt/solax/.env
+API_ENABLED=true
+API_KEY=<a long random secret>          # openssl rand -hex 32
+```
+
+The key's **name** is what lands in the log and in the recorded charging session as the source of an
+action, so a key of this server's own is worth the one extra line — *"API (claude-mcp) started
+Targeted"* beats an anonymous write. Add it to the `gleanvolt-controller` service and to `.env`:
+
+```yaml
+      Api__Keys__claude-mcp: ${MCP_API_KEY:-}
+```
+
+`GLEANVOLT_API_KEY` below is the **secret**, never the name.
+
+**Then pull the image.** Not build — the Pi resolves `linux/arm64` from the manifest list itself:
+
+```bash
+docker pull ghcr.io/mpospisil/gleanvolt-mcp:latest
+```
+
+#### Option A — a service in the existing stack (recommended)
+
+Add it to `/opt/solax/docker-compose.yml`. On that network it reaches the controller by service name,
+and Home Assistant reaches it by service name in turn, so nothing has to be published to the LAN:
+
+```yaml
+  gleanvolt-mcp:
+    image: ghcr.io/mpospisil/gleanvolt-mcp:${MCP_IMAGE_TAG:-latest}
+    container_name: gleanvolt-mcp
+    restart: unless-stopped
+    environment:
+      # The controller's service name on this network -- no IP, no mDNS, and it keeps working when
+      # the Pi's address changes.
+      GLEANVOLT_URL: http://gleanvolt-controller:8090
+      GLEANVOLT_API_KEY: ${MCP_API_KEY:?}
+      GLEANVOLT_MCP_ALLOW_WRITES: ${MCP_ALLOW_WRITES:-false}
+    # No `ports:`. Home Assistant is on this network, and publishing 8091 would put an endpoint that
+    # can move a charger on the LAN for nothing.
+    expose:
+      - 8091
+    mem_limit: 128m
+    depends_on:
+      - gleanvolt-controller
+```
+
+```bash
+cd /opt/solax
+docker compose up -d gleanvolt-mcp
+docker compose logs gleanvolt-mcp
+```
+
+Then point Home Assistant at `http://gleanvolt-mcp:8091/mcp`, exactly as in
+[Serving it over HTTP](#serving-it-over-http) above.
+
+#### Option B — a standalone container on the same Pi
+
+If you would rather not touch the deployment's compose file:
+
+```bash
+docker run -d --name gleanvolt-mcp --restart unless-stopped -p 8091:8091 \
+  -e GLEANVOLT_URL=http://192.168.2.7:8090 \
+  -e GLEANVOLT_API_KEY=<the secret> \
+  ghcr.io/mpospisil/gleanvolt-mcp:latest
+```
+
+**Not `localhost`.** Inside a container that is the container's own loopback, not the Pi's, and the
+connection is refused with nothing in the controller's log to show for it. Use the Pi's LAN address as
+above, or `--network container:gleanvolt-controller`, or join the deployment's network with
+`--network solax_default` and go back to using the service name.
+
+#### Four things that actually bite on a Pi
+
+- **`mem_limit` is silently ignored** until cgroup memory accounting is enabled — Raspberry Pi OS ships
+  with it off, `docker stats` shows `0B / 0B`, and nothing warns you. The fix is one line in
+  `cmdline.txt` and a reboot: see
+  [Platforms](https://github.com/mpospisil/gleanvolt/wiki/Platforms) in the Gleanvolt wiki.
+- **Leave writes off unless you mean it.** In HTTP mode `GLEANVOLT_MCP_ALLOW_WRITES` is one switch for
+  every client at once, and a voice assistant is not a place where a person is reliably watching the
+  conversation. See [Writes are opt-in](#writes-are-opt-in).
+- **Leave `GLEANVOLT_MCP_HTTP_TOKEN` unset for Home Assistant.** Its config flow has no field for a
+  bearer token, so setting one makes the integration fail at `initialize` with a 401. The token is for
+  clients that can send one, such as `claude mcp add --transport http … --header "Authorization: Bearer …"`.
+- **Read the first log line before trusting anything.** It names the build, the installation, the tool
+  count and the write state in one place:
+
+  ```
+  Gleanvolt MCP 1.0.0 (31bf347) serving http://gleanvolt-controller:8090/ as 9 tools at http://0.0.0.0:8091/mcp; writes are disabled.
+  ```
+
+  `0.0.0-dev` with no commit means a local build, not a published image. A missing or malformed
+  variable exits at launch with the reason on stderr instead of starting a server whose every tool
+  would answer with the same connection error.
+
+#### Upgrading, and going back
+
+```bash
+cd /opt/solax
+docker compose pull gleanvolt-mcp && docker compose up -d gleanvolt-mcp
+```
+
+Nothing is lost by restarting this container — it holds no state, keeps no session and stores nothing
+on disk. To go back to a build that worked, pin the tag rather than hunting for the old image:
+`MCP_IMAGE_TAG=sha-abc1234` in `.env`, then the same two commands.
+
+### Windows
+
+The Windows image is Nano Server `ltsc2022`, which runs on both Windows Server 2022 and 2025 hosts; the
+daemon must be in **Windows containers** mode. It is amd64 only — there is no arm64 Windows image, and
+the manifest list simply has nothing to offer an arm64 Windows host.
+
+```bat
+docker run -d --name gleanvolt-mcp --restart unless-stopped -p 8091:8091 ^
+  -e GLEANVOLT_URL=http://192.168.2.7:8090 ^
+  -e GLEANVOLT_API_KEY=<the secret> ^
+  ghcr.io/mpospisil/gleanvolt-mcp:latest
+```
+
+Unlike the controller, this server needs no timezone configuration on Windows: it records nothing and
+stamps nothing with a local date, and the build already sets `InvariantGlobalization`.
+
+### Building one yourself
+
+Only needed to test an unreleased change — the published images are cross-compiled rather than
+emulated, so no QEMU is involved and an amd64 machine produces an arm64 image at full speed.
+
+```bash
+docker build --platform linux/arm64 -t gleanvolt-mcp .
+docker build --platform linux/amd64 -t gleanvolt-mcp .
+
+# Windows needs its own Dockerfile -- a Dockerfile targets one OS, and a Windows
+# runtime stage only assembles on a Windows daemon.
+docker build -f Dockerfile.windows -t gleanvolt-mcp:nanoserver .
+```
+
+A build with no `--build-arg VERSION=` is stamped `0.0.0-dev`, which is the point: it says at startup
+that it is a local build rather than claiming a version it does not have.
 
 ## The contract
 
