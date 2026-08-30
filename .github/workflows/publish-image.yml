@@ -294,14 +294,44 @@ jobs:
           arm64="${image}:${VERSION}-linux-arm64"
           windows="${image}:${VERSION}-nanoserver-ltsc2022"
 
+          # One tag, built from scratch every time. `docker manifest create` reads all three source
+          # manifests back from the registry, so this is where a flaky GHCR CDN shows up -- and it did:
+          # a "connection reset by peer" on a blob read left :main updated while :latest and :sha- were
+          # never written, which is the partially-published release this job exists to prevent.
+          #
+          # `docker manifest rm` first because create refuses a list it already holds locally, and an
+          # attempt that died between create and push leaves exactly that behind. It fails when there is
+          # nothing to remove, which is the normal case, hence the `|| true`.
+          #
+          # Every step returns explicitly rather than relying on errexit: this function is called from an
+          # `until` condition, and bash suspends `set -e` inside a function invoked that way.
+          publish() {
+            tag=$1
+            docker manifest rm "$tag" >/dev/null 2>&1 || true
+            docker manifest create "$tag" "$amd64" "$arm64" "$windows" || return 1
+            # The Linux entries carry correct platforms already; only the Windows one is short a field.
+            docker manifest annotate "$tag" "$windows" \
+              --os windows --arch amd64 --os-version "$WIN_OS_VERSION" || return 1
+            docker manifest push "$tag" || return 1
+          }
+
           while read -r tag; do
             [ -n "$tag" ] || continue
             echo "::group::$tag"
-            docker manifest create "$tag" "$amd64" "$arm64" "$windows"
-            # The Linux entries carry correct platforms already; only the Windows one is short a field.
-            docker manifest annotate "$tag" "$windows" \
-              --os windows --arch amd64 --os-version "$WIN_OS_VERSION"
-            docker manifest push "$tag"
+
+            attempt=1
+            until publish "$tag"; do
+              if [ "$attempt" -ge 3 ]; then
+                echo "::endgroup::"
+                echo "$tag failed $attempt times; the last error is above." >&2
+                exit 1
+              fi
+              delay=$((attempt * 15))
+              echo "Attempt $attempt at $tag failed; retrying in ${delay}s." >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+            done
+
             echo "::endgroup::"
           done <<< "$TAGS"
         # REGISTRY and IMAGE_NAME come from the workflow env.
