@@ -10,19 +10,41 @@ public sealed class ServerInstructionsTests
     [Fact]
     public void A_read_only_server_names_the_switch_and_who_can_throw_it()
     {
-        var instructions = ServerInstructions.For(allowWrites: false);
+        foreach (var transport in new[] { Transport.Stdio, Transport.Http })
+        {
+            var instructions = ServerInstructions.For(allowWrites: false, transport);
 
-        // The variable by name: an operator reading this over the model's shoulder has to be able to
-        // act on it without going to the README first.
-        Assert.Contains(GleanvoltOptions.WritesVariable, instructions, StringComparison.Ordinal);
-        Assert.Contains("READ-ONLY", instructions, StringComparison.Ordinal);
-        Assert.Contains("restarting the client", instructions, StringComparison.Ordinal);
+            // The variable by name: an operator reading this over the model's shoulder has to be able
+            // to act on it without going to the README first.
+            Assert.Contains(GleanvoltOptions.WritesVariable, instructions, StringComparison.Ordinal);
+            Assert.Contains("READ-ONLY", instructions, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// The advice has to be actionable in the transport it is given in. A stdio server is respawned by
+    /// its client, so restarting the client is what picks the variable up; an HTTP server outlives
+    /// every client attached to it, and telling someone to restart Home Assistant would send them off
+    /// to do a thing that changes nothing.
+    /// </summary>
+    [Fact]
+    public void A_read_only_server_names_the_restart_that_would_actually_help()
+    {
+        Assert.Contains(
+            "restarting the client",
+            ServerInstructions.For(allowWrites: false, Transport.Stdio),
+            StringComparison.Ordinal);
+
+        var http = ServerInstructions.For(allowWrites: false, Transport.Http);
+
+        Assert.Contains("restarting the server process", http, StringComparison.Ordinal);
+        Assert.DoesNotContain("restarting the client", http, StringComparison.Ordinal);
     }
 
     [Fact]
     public void A_read_only_server_names_the_tools_it_is_missing()
     {
-        var instructions = ServerInstructions.For(allowWrites: false);
+        var instructions = ServerInstructions.For(allowWrites: false, Transport.Stdio);
 
         // Named rather than described, so the answer is specific about what cannot be done here.
         Assert.Contains("gleanvolt_start", instructions, StringComparison.Ordinal);
@@ -35,13 +57,13 @@ public sealed class ServerInstructionsTests
     {
         // The failure is not only "no", it is "no, and nothing instead". A priced plan is genuinely
         // useful even when this server cannot start it.
-        Assert.Contains("gleanvolt_quote_plan", ServerInstructions.For(allowWrites: false), StringComparison.Ordinal);
+        Assert.Contains("gleanvolt_quote_plan", ServerInstructions.For(allowWrites: false, Transport.Stdio), StringComparison.Ordinal);
     }
 
     [Fact]
     public void A_writable_server_does_not_tell_anyone_to_enable_anything()
     {
-        var instructions = ServerInstructions.For(allowWrites: true);
+        var instructions = ServerInstructions.For(allowWrites: true, Transport.Stdio);
 
         Assert.DoesNotContain(GleanvoltOptions.WritesVariable, instructions, StringComparison.Ordinal);
         Assert.DoesNotContain("READ-ONLY", instructions, StringComparison.Ordinal);
@@ -50,7 +72,7 @@ public sealed class ServerInstructionsTests
     [Fact]
     public void A_writable_server_says_what_it_can_break_and_how_to_report_it()
     {
-        var instructions = ServerInstructions.For(allowWrites: true);
+        var instructions = ServerInstructions.For(allowWrites: true, Transport.Stdio);
 
         Assert.Contains("Confirm with the person", instructions, StringComparison.Ordinal);
         Assert.Contains("gleanvolt_quote_plan", instructions, StringComparison.Ordinal);
@@ -64,7 +86,13 @@ public sealed class ServerInstructionsTests
     [Fact]
     public void Both_say_which_installation_this_is()
     {
-        foreach (var instructions in new[] { ServerInstructions.For(true), ServerInstructions.For(false) })
+        foreach (var instructions in new[]
+                 {
+                     ServerInstructions.For(true, Transport.Stdio),
+                     ServerInstructions.For(false, Transport.Stdio),
+                     ServerInstructions.For(true, Transport.Http),
+                     ServerInstructions.For(false, Transport.Http),
+                 })
         {
             Assert.Contains("one Gleanvolt installation", instructions, StringComparison.Ordinal);
         }

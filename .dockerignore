@@ -1,0 +1,8 @@
+# Build output belongs to the host that made it. Copying bin/ and obj/ into the build context does not
+# just bloat it -- a host obj/ carries absolute paths and a restore graph from another machine, and the
+# container build will happily pick them up and fail somewhere less obvious.
+**/bin/
+**/obj/
+.git/
+.github/
+.claude/

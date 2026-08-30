@@ -102,9 +102,17 @@ resolves only by luck, and when it does not, the client drops the server without
 | `GLEANVOLT_URL` | yes | Base address of the installation, e.g. `http://gleanvolt.local:8090` — use the IP if mDNS does not resolve from the client machine |
 | `GLEANVOLT_API_KEY` | yes | One of the installation's `Api:Keys` |
 | `GLEANVOLT_MCP_ALLOW_WRITES` | no | `true` registers the four control tools. Anything else leaves this server read-only |
+| `GLEANVOLT_MCP_TRANSPORT` | no | `stdio` (the default) or `http`. See [Serving it over HTTP](#serving-it-over-http) |
+| `GLEANVOLT_MCP_HTTP_URL` | no | HTTP mode only. What to bind, default `http://0.0.0.0:8091` |
+| `GLEANVOLT_MCP_HTTP_TOKEN` | no | HTTP mode only. A bearer token every request must present. Unset leaves the endpoint open |
 
 Missing or malformed configuration **exits at launch** with a message on stderr, rather than starting a
 server whose every tool would answer with the same connection error.
+
+`GLEANVOLT_MCP_TRANSPORT` is the one variable that refuses a value it does not recognise, rather than
+falling back. `GLEANVOLT_MCP_ALLOW_WRITES` can afford to treat a typo as "no", because that leaves the
+hardware alone. A typo here has no safe side to fall on: `htpp` quietly starting a stdio server would
+produce a process reading a stdin nobody is writing to, which looks exactly like a hang.
 
 ### Writes are opt-in
 
@@ -138,7 +146,7 @@ lands in the charging session as the source of the action.
 To confirm which mode it came up in, read the server's first line on stderr:
 
 ```
-Serving http://gleanvolt.local:8090/ as 13 tools; writes are ENABLED.
+Serving http://gleanvolt.local:8090/ as 13 tools over stdio; writes are ENABLED.
 ```
 
 Nine tools and `disabled` means the variable never reached the process. From the client side, `/mcp`
@@ -152,6 +160,100 @@ can change it, instead of saying it does not know how.
 a few seconds after the write and returns what it saw. A 200 means the register was written, not that
 the inverter honoured it, and the tool's description tells the model to report the read-back rather
 than the acknowledgement.
+
+### Serving it over HTTP
+
+Everything above launches one server per client, over stdin and stdout, and it stays the default.
+`GLEANVOLT_MCP_TRANSPORT=http` builds the other host instead: one long-running process that any number
+of clients reach over the network at the same time.
+
+That is what [Home Assistant's `mcp` integration](https://www.home-assistant.io/integrations/mcp/)
+needs. It is a client that points at a URL and cannot spawn anything, so something has to be listening
+before it can be configured at all.
+
+```bash
+docker build -t gleanvolt-mcp .
+
+docker run -d --name gleanvolt-mcp --restart unless-stopped -p 8091:8091 \
+  -e GLEANVOLT_URL=http://<the installation>:8090 \
+  -e GLEANVOLT_API_KEY=<the key> \
+  gleanvolt-mcp
+```
+
+The image sets `GLEANVOLT_MCP_TRANSPORT=http` itself — nothing is attached to its stdin, so no other
+mode would work — and runs as a non-root user. Confirm it came up on the address you expect:
+
+```
+Serving http://gleanvolt.local:8090/ as 9 tools at http://0.0.0.0:8091/mcp; writes are disabled.
+```
+
+As a service alongside Home Assistant in the same compose stack:
+
+```yaml
+  gleanvolt-mcp:
+    build: https://github.com/mpospisil/gleanvolt-mcp.git
+    restart: unless-stopped
+    environment:
+      GLEANVOLT_URL: http://<the installation>:8090
+      GLEANVOLT_API_KEY: ${GLEANVOLT_MCP_API_KEY:?}
+      GLEANVOLT_MCP_ALLOW_WRITES: ${GLEANVOLT_MCP_ALLOW_WRITES:-false}
+    # No `ports:` when Home Assistant is on this network. It reaches the container by service name,
+    # and publishing to the host would put the endpoint on the LAN for nothing.
+    expose:
+      - 8091
+```
+
+The first build pulls the .NET SDK image and compiles from source, which on a Pi takes several minutes;
+after that it is cached. Build it once on a faster machine and push the image to a registry if you would
+rather not.
+
+Then in Home Assistant, **Settings → Devices & services → Add integration → Model Context Protocol**,
+and give it the URL:
+
+```
+http://gleanvolt-mcp:8091/mcp
+```
+
+`http://<the host>:8091/mcp` if you published the port instead. The path is `/mcp` and is not
+configurable. Ignore the field's help text, which still says "the SSE endpoint" — the integration tries
+Streamable HTTP first and only falls back to SSE if that is refused, and the label has not caught up.
+The integration calls `initialize` when you submit the form, so a wrong address or an unreachable
+installation is a failure in the dialog rather than a silent no-op later. The tools then
+appear to whichever conversation agent you have given the MCP integration's tools to.
+
+**On authentication.** Home Assistant's config flow asks for a URL and nothing else — a bearer token
+has no field to go in, and the only credential it can supply is an OAuth one it negotiates itself.
+So for Home Assistant, leave `GLEANVOLT_MCP_HTTP_TOKEN` unset and keep the endpoint on a network you
+trust: a compose network with no published port, or a LAN behind your router. Setting a token makes the
+integration fail at `initialize` with a 401.
+
+The token is there for the clients that *can* send one. Claude Code reaches the same running server
+with it:
+
+```bash
+claude mcp add --transport http gleanvolt http://<the host>:8091/mcp \
+  --header "Authorization: Bearer <the token>"
+```
+
+A few consequences of one process serving everybody, worth knowing before you enable writes on it:
+
+- **The write switch is now per-server, not per-client.** Over stdio each client gets its own process
+  and its own `GLEANVOLT_MCP_ALLOW_WRITES`. Here one setting decides for every client at once, and a
+  Home Assistant voice assistant is not a place where a person is reliably watching the conversation.
+  Read-only is the sensible default for a shared instance.
+- **Attribution collapses to one name.** This server sends its single `GLEANVOLT_API_KEY` on every
+  call, so every action from every client lands in the charging session under that one key's name. If
+  you want to tell Home Assistant's writes apart from Claude Code's, run two containers with two keys —
+  `Api__Keys__home-assistant` and `Api__Keys__claude-mcp` — on two ports.
+- **Home Assistant gives a tool call ten seconds.** `gleanvolt_quote_plan` and a wide
+  `gleanvolt_energy_intervals` are the two that can take longer than that on a busy Pi; this server
+  allows the installation thirty, so a slow answer reaches Home Assistant as a timeout on its side
+  while the call itself completes.
+
+The server is stateless: no session is kept between requests, which is what Home Assistant's pattern of
+opening a connection per tool call and closing it again actually wants. Only the Streamable HTTP
+endpoint is mapped — the legacy `/sse` and `/message` pair is off, and Home Assistant tries Streamable
+HTTP first.
 
 ## The contract
 
