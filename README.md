@@ -250,6 +250,63 @@ A few consequences of one process serving everybody, worth knowing before you en
   allows the installation thirty, so a slow answer reaches Home Assistant as a timeout on its side
   while the call itself completes.
 
+#### Turning writes on
+
+Having read those, the switch is one more variable on the container. It is the same
+`GLEANVOLT_MCP_ALLOW_WRITES` as over stdio — what changes is that here it decides for every client at
+once, so set it on a server whose endpoint you know who can reach.
+
+```bash
+docker run -d --name gleanvolt-mcp --restart unless-stopped -p 8091:8091 \
+  -e GLEANVOLT_URL=http://<the installation>:8090 \
+  -e GLEANVOLT_API_KEY=<the key> \
+  -e GLEANVOLT_MCP_ALLOW_WRITES=true \
+  ghcr.io/mpospisil/gleanvolt-mcp:latest
+```
+
+Under Compose the variable is already wired to `.env`, so nothing in the service definition changes:
+
+```bash
+# .env, alongside the compose file
+GLEANVOLT_MCP_ALLOW_WRITES=true
+```
+
+**A running container cannot be switched.** The tool list is built once, at launch, so a server that
+came up read-only stays read-only however the environment changes underneath it — and an MCP client
+caches what it was advertised on top of that. The container has to be replaced, not restarted:
+
+```bash
+docker rm -f gleanvolt-mcp     # then the docker run above
+docker compose up -d gleanvolt-mcp   # recreates it, because the environment changed
+```
+
+`docker restart` is the one that looks like it worked and did not: same container, same process
+arguments, same nine tools.
+
+Confirm it on the first line of the log rather than by trying a control tool — thirteen and `ENABLED`,
+where a read-only server says nine and `disabled`:
+
+```
+Gleanvolt MCP 1.0.0 (31bf347) serving http://gleanvolt.local:8090/ as 13 tools at http://0.0.0.0:8091/mcp; writes are ENABLED.
+```
+
+```bash
+docker logs gleanvolt-mcp | head -2
+```
+
+Nine tools and `disabled` means the variable never reached the process — under Compose that is usually
+an `.env` in a different directory from the one `docker compose` was run in. The value is matched
+against `true` case-insensitively and nothing else: `1`, `yes` and `on` all leave the server read-only,
+deliberately, because a typo should leave the hardware alone.
+
+Two things worth settling before this is a permanent part of the stack. Give the server **its own API
+key** on the installation — every write lands in the charging session under that key's name, and
+`Api__Keys__claude-mcp` is the difference between *"API (claude-mcp) started Targeted"* and an
+anonymous entry. And decide whether Home Assistant should have it: the four control tools become
+available to whichever conversation agent holds the MCP integration's tools, which is a voice assistant
+acting without a person necessarily reading the reply. Running two containers — one read-only for Home
+Assistant, one with writes for Claude Code, two keys, two ports — is the honest way to have both.
+
 The server is stateless: no session is kept between requests, which is what Home Assistant's pattern of
 opening a connection per tool call and closing it again actually wants. Only the Streamable HTTP
 endpoint is mapped — the legacy `/sse` and `/message` pair is off, and Home Assistant tries Streamable
