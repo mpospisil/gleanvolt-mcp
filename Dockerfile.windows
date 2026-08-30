@@ -1,0 +1,85 @@
+# escape=`
+#
+# Windows Nano Server image for the Gleanvolt MCP server.
+#
+# Separate from the Linux Dockerfile rather than merged into it: a Dockerfile builds for one OS, and a
+# Windows runtime stage can only be assembled on a Windows daemon. CI therefore runs this on a
+# windows-2022 runner and folds the result into the same manifest list as the Linux images
+# (.github/workflows/publish-image.yml).
+#
+#   docker build -f Dockerfile.windows -t gleanvolt-mcp:nanoserver .
+#
+# ltsc2022 rather than ltsc2025: an ltsc2022 container runs on both Windows Server 2022 and 2025
+# hosts, whereas ltsc2025 requires a 2025 host.
+#
+# The escape directive above matters -- the default escape character is a backslash, which is also the
+# Windows path separator.
+
+ARG DOTNET_VERSION=10.0
+ARG WINDOWS_VERSION=ltsc2022
+
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS build
+
+# As in the Linux Dockerfile: the defaults match Directory.Build.props, so a plain build is labelled a
+# local one and CI passes the release version and commit. See src/Gleanvolt.Mcp/BuildInfo.cs.
+ARG VERSION=0.0.0-dev
+ARG SOURCE_REVISION=
+
+WORKDIR C:\src
+
+# The same layer split as the Linux build: project files first, so the restore layer survives a source
+# edit. No -a argument here -- Windows containers are amd64 only, so there is nothing to select and
+# nothing to cross-compile.
+COPY Directory.Build.props Gleanvolt.Mcp.slnx ./
+COPY src/Gleanvolt.Mcp/Gleanvolt.Mcp.csproj src/Gleanvolt.Mcp/
+COPY tests/Gleanvolt.Mcp.Tests/Gleanvolt.Mcp.Tests.csproj tests/Gleanvolt.Mcp.Tests/
+RUN dotnet restore src\Gleanvolt.Mcp\Gleanvolt.Mcp.csproj
+
+COPY . .
+
+# PublishSingleFile off for the same reason as the Linux image: inside a container there is no path to
+# simplify, and the single-file host would have to be pinned to a runtime identifier. RUN here is cmd,
+# so the build arguments are read as %VERSION% rather than $VERSION.
+RUN dotnet publish src\Gleanvolt.Mcp\Gleanvolt.Mcp.csproj `
+      --configuration Release `
+      --no-restore `
+      --self-contained false `
+      -p:PublishSingleFile=false `
+      -p:Version=%VERSION% `
+      -p:SourceRevisionId=%SOURCE_REVISION% `
+      --output C:\app
+
+# The ASP.NET runtime, not the bare one: ModelContextProtocol.AspNetCore carries a FrameworkReference
+# on Microsoft.AspNetCore.App, so the published binary needs it in both transports.
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-nanoserver-${WINDOWS_VERSION} AS runtime
+
+WORKDIR C:\app
+COPY --from=build C:\app .
+
+# The terms travel with the artifact, as on the Linux image.
+COPY LICENSE C:\app\
+
+# This job builds with plain `docker build` rather than build-push-action, so nothing injects OCI
+# labels for it -- without this line the Windows image would carry none at all. metadata-action fills
+# the rest in for the Linux images.
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.source="https://github.com/mpospisil/gleanvolt-mcp"
+
+# Both baked in for the same reasons as the Linux image: nothing is attached to this container's stdin,
+# and the base image's ASPNETCORE_HTTP_PORTS would otherwise draw a warning on every start.
+ENV GLEANVOLT_MCP_TRANSPORT=http
+ENV ASPNETCORE_HTTP_PORTS=
+
+EXPOSE 8091
+
+# Two things the Linux image needs that this one deliberately does not, so nobody adds them back for
+# parity:
+#
+#   No USER. $APP_UID is a Linux base-image convention and is not defined here; the Nano Server runtime
+#   image already runs as ContainerUser, which is not an administrator.
+#
+#   No timezone configuration. Nano Server ships no ICU, which on the controller breaks the
+#   IANA-to-Windows zone mapping -- but this server records nothing, stamps nothing with a local date,
+#   and already sets InvariantGlobalization. There is no zone for it to get wrong.
+
+ENTRYPOINT ["dotnet", "Gleanvolt.Mcp.dll"]

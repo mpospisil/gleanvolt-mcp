@@ -133,7 +133,9 @@ static bool Presented(string header, string expected)
 }
 
 // The first line in the log, and the one an operator reads to confirm which mode the server came up in:
-// which installation, how many tools, and -- over HTTP -- the address to give the client.
+// which build, which installation, how many tools, and -- over HTTP -- the address to give the client.
+// The build is first because it is what a bug report needs and what a pulled image makes ambiguous:
+// ":latest" names no version, so the running process has to say which one it is.
 static void Announce(IServiceProvider services, GleanvoltOptions options, Uri? endpoint)
 {
     var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("Gleanvolt.Mcp");
@@ -141,7 +143,8 @@ static void Announce(IServiceProvider services, GleanvoltOptions options, Uri? e
     if (endpoint is null)
     {
         logger.LogInformation(
-            "Serving {Base} as {Count} tools over stdio; writes are {Writes}.",
+            "Gleanvolt MCP {Build} serving {Base} as {Count} tools over stdio; writes are {Writes}.",
+            BuildInfo.Describe(),
             options.BaseAddress,
             ServerRegistration.ToolCount(options.AllowWrites),
             options.AllowWrites ? "ENABLED" : "disabled");
@@ -150,7 +153,8 @@ static void Announce(IServiceProvider services, GleanvoltOptions options, Uri? e
     }
 
     logger.LogInformation(
-        "Serving {Base} as {Count} tools at {Endpoint}; writes are {Writes}.",
+        "Gleanvolt MCP {Build} serving {Base} as {Count} tools at {Endpoint}; writes are {Writes}.",
+        BuildInfo.Describe(),
         options.BaseAddress,
         ServerRegistration.ToolCount(options.AllowWrites),
         endpoint,

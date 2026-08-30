@@ -43,7 +43,10 @@ internal static class ServerRegistration
         var mcp = services
             .AddMcpServer(server =>
             {
-                server.ServerInfo = new() { Name = "gleanvolt", Version = "0.1.0" };
+                // The version a client is shown at initialize is the build's own, not a literal kept in
+                // step by hand. A hardcoded one goes stale silently: nothing fails when it disagrees
+                // with the image tag, it just misleads whoever is reading it.
+                server.ServerInfo = new() { Name = "gleanvolt", Version = BuildInfo.Version };
 
                 // What the client is told at initialize, and the only place a read-only server can explain
                 // itself: the tools it would have refused with are not there to carry the explanation.
