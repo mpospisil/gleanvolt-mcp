@@ -114,6 +114,39 @@ falling back. `GLEANVOLT_MCP_ALLOW_WRITES` can afford to treat a typo as "no", b
 hardware alone. A typo here has no safe side to fall on: `htpp` quietly starting a stdio server would
 produce a process reading a stdin nobody is writing to, which looks exactly like a hang.
 
+### Two secrets, not one
+
+`GLEANVOLT_API_KEY` and `GLEANVOLT_MCP_HTTP_TOKEN` are both bearer tokens and are both wrong as each
+other's value. They guard two different hops:
+
+```
+ a client ──(1) Bearer GLEANVOLT_MCP_HTTP_TOKEN──▶ this server ──(2) Bearer GLEANVOLT_API_KEY──▶ the installation :8090
+```
+
+| | Who checks it | What it protects |
+|---|---|---|
+| `GLEANVOLT_MCP_HTTP_TOKEN` | this server, on every request it receives | the MCP endpoint, against whoever else can reach the port |
+| `GLEANVOLT_API_KEY` | the installation | the controller's API — and it is the name that lands in the charging session |
+
+**`GLEANVOLT_API_KEY` never leaves this process.** No client sends it and no client needs to know it:
+the server attaches it to hop 2 itself. What a client sends is hop 1, and hop 1 exists only if you
+configured a token for it.
+
+That last point is the trap. `GLEANVOLT_MCP_HTTP_TOKEN` is optional, and when it is unset **no
+authentication middleware is registered at all** — so a client that sends the API key, or any other
+string, or no header whatsoever, is let in identically. It looks authenticated and is not. Anyone who
+can reach the port has the tools, and the charger too if writes are on.
+
+One command settles which state a running server is in. Send a token you know is wrong: `401` means it
+is being enforced, `200` means nothing is checking:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://<the host>:8091/mcp \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -H 'Authorization: Bearer definitely-wrong' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
+```
+
 ### Writes are opt-in
 
 Four of these tools move real hardware. Left alone, they are not registered at all — the model is not
@@ -234,6 +267,9 @@ with it:
 claude mcp add --transport http gleanvolt http://<the host>:8091/mcp \
   --header "Authorization: Bearer <the token>"
 ```
+
+`<the token>` is `GLEANVOLT_MCP_HTTP_TOKEN`, not `GLEANVOLT_API_KEY` — see
+[Two secrets, not one](#two-secrets-not-one). The API key never leaves the server.
 
 A few consequences of one process serving everybody, worth knowing before you enable writes on it:
 
@@ -479,6 +515,9 @@ it wanted. A hang or a refused connection is the Pi's firewall or a `ports:` ent
 claude mcp add --transport http gleanvolt http://raspberrypi.local:8091/mcp \
   --header "Authorization: Bearer <the token>"
 ```
+
+Again, that is `GLEANVOLT_MCP_HTTP_TOKEN` and not the installation's API key — two different secrets,
+guarding two different hops ([Two secrets, not one](#two-secrets-not-one)).
 
 `/mcp` in Claude Code then lists what it was actually given — nine tools, or thirteen if you enabled
 writes on the container.
