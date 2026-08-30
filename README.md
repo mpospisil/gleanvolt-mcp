@@ -422,6 +422,105 @@ connection is refused with nothing in the controller's log to show for it. Use t
 above, or `--network container:gleanvolt-controller`, or join the deployment's network with
 `--network solax_default` and go back to using the service name.
 
+#### Reaching it from another machine
+
+Both options above leave the endpoint on the Pi. Option A publishes nothing at all — Home Assistant
+reaches it over the Compose network — and Option B publishes it on the Pi's own interfaces. To drive it
+from a PC on the same network, say Claude Code on a laptop, two things have to change: the port has to
+be published, and the endpoint is then on your LAN rather than inside a container network, which is the
+point at which the token stops being optional.
+
+**Publish the port.** If you took Option A, that is a `ports:` entry — `expose:` alone does not make it
+reachable from off the host:
+
+```yaml
+    ports:
+      - "8091:8091"
+```
+
+Nothing changes inside the container. The server already binds every interface it has —
+`http://0.0.0.0:8091`, which the startup line says out loud — so `-p` is the only switch involved and
+`GLEANVOLT_MCP_HTTP_URL` can stay unset.
+
+**Then put a token on it.** On a Compose network the absence of one was defensible; on a LAN it means
+anyone who can reach the Pi gets the tools, and if writes are on, the charger. The variable is fixed at
+container creation, like the write switch, so this is a recreate rather than a restart:
+
+```yaml
+    environment:
+      GLEANVOLT_MCP_HTTP_TOKEN: ${MCP_HTTP_TOKEN:?}     # openssl rand -hex 32
+```
+
+```bash
+cd /opt/solax
+docker compose up -d gleanvolt-mcp     # recreates it, because the environment changed
+```
+
+**Check it from the PC before registering anything.** Two probes, in order — the first says whether the
+port is reachable at all, the second whether the server behind it is the one you think:
+
+```bash
+nc -vz raspberrypi.local 8091
+
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://raspberrypi.local:8091/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Authorization: Bearer <the token>' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
+```
+
+`200` is the answer you want. `401` means the token is wrong or missing — the body says which variable
+it wanted. A hang or a refused connection is the Pi's firewall or a `ports:` entry that never took;
+`docker ps` on the Pi shows `0.0.0.0:8091->8091/tcp` when it did.
+
+**Then register it.** The URL and the header are stored with the registration, so this is typed once:
+
+```bash
+claude mcp add --transport http gleanvolt http://raspberrypi.local:8091/mcp \
+  --header "Authorization: Bearer <the token>"
+```
+
+`/mcp` in Claude Code then lists what it was actually given — nine tools, or thirteen if you enabled
+writes on the container.
+
+**On the address.** `raspberrypi.local` is mDNS and resolves from most desktops but not from every
+network; use the Pi's IP if it does not. Either way the address is baked into the registration, so give
+the Pi a DHCP reservation on your router — a Pi that moves to a new lease leaves every client pointing
+at nothing, and the failure arrives as a tool that has quietly stopped existing.
+
+**If Home Assistant is also using it, run two containers.** Home Assistant's config flow cannot send a
+bearer token, so a single container cannot be both token-protected for your PC and reachable by Home
+Assistant: setting the token makes Home Assistant fail at `initialize` with a 401. Two services solve
+it honestly, and separate the write switch and the attribution at the same time:
+
+```yaml
+  # Home Assistant's, on the Compose network only. No token, because it cannot send one; read-only,
+  # because a voice assistant is not a place where a person is reliably watching.
+  gleanvolt-mcp:
+    image: ghcr.io/mpospisil/gleanvolt-mcp:latest
+    environment:
+      GLEANVOLT_URL: http://gleanvolt-controller:8090
+      GLEANVOLT_API_KEY: ${HA_API_KEY:?}
+    expose:
+      - 8091
+
+  # Yours, published and token-protected. Writes here if you want them anywhere.
+  gleanvolt-mcp-lan:
+    image: ghcr.io/mpospisil/gleanvolt-mcp:latest
+    environment:
+      GLEANVOLT_URL: http://gleanvolt-controller:8090
+      GLEANVOLT_API_KEY: ${MCP_API_KEY:?}
+      GLEANVOLT_MCP_HTTP_TOKEN: ${MCP_HTTP_TOKEN:?}
+      GLEANVOLT_MCP_ALLOW_WRITES: ${MCP_ALLOW_WRITES:-false}
+    ports:
+      - "8091:8091"
+```
+
+Only the host side of the published port has to be unique — both containers listen on 8091 inside
+their own network namespace, and only the second one has a host port at all. Give them two keys on the
+installation, `Api__Keys__home-assistant` and `Api__Keys__claude-mcp`, and the charging session records
+which of the two started a charge.
+
 #### Four things that actually bite on a Pi
 
 - **`mem_limit` is silently ignored** until cgroup memory accounting is enabled — Raspberry Pi OS ships
@@ -434,6 +533,8 @@ above, or `--network container:gleanvolt-controller`, or join the deployment's n
 - **Leave `GLEANVOLT_MCP_HTTP_TOKEN` unset for Home Assistant.** Its config flow has no field for a
   bearer token, so setting one makes the integration fail at `initialize` with a 401. The token is for
   clients that can send one, such as `claude mcp add --transport http … --header "Authorization: Bearer …"`.
+  If you need both, that is two containers — see
+  [Reaching it from another machine](#reaching-it-from-another-machine).
 - **Read the first log line before trusting anything.** It names the build, the installation, the tool
   count and the write state in one place:
 
