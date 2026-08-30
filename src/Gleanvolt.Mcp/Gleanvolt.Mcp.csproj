@@ -28,6 +28,14 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
     <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+
+    <!--
+      The HTTP host. It carries a FrameworkReference on Microsoft.AspNetCore.App, so the published
+      binary now needs the ASP.NET Core runtime rather than the bare .NET one - true for both modes,
+      because one executable serves both. The `dotnet-sdk` package includes it; a machine with only
+      `dotnet-runtime` installed needs `aspnetcore-runtime` as well.
+    -->
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
   </ItemGroup>
 
 </Project>

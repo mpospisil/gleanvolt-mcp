@@ -29,7 +29,7 @@ internal static class ServerInstructions
         If you are asked to do any of those, do not report that you do not know how, and do not
         improvise with the read tools. Say that this server is running read-only, and that the operator
         can change it by setting GLEANVOLT_MCP_ALLOW_WRITES=true in the server's environment and
-        restarting the client. Then offer what you can still do: gleanvolt_quote_plan prices a targeted
+        {0}. Then offer what you can still do: gleanvolt_quote_plan prices a targeted
         charge exactly as the real thing would run, writes to nothing, and is worth showing anyway --
         the person can start it themselves from the web UI once they have seen the numbers.
         """;
@@ -47,7 +47,21 @@ internal static class ServerInstructions
         inverter quietly ignored is visible only in the power read back afterwards.
         """;
 
+    /// <summary>
+    /// Who has to restart what, which is not the same sentence in both transports and is the one part
+    /// of this text an operator is expected to act on. A stdio server is spawned by its client and
+    /// dies with it, so the client is the thing to restart; an HTTP server outlives every client
+    /// connected to it, and restarting Home Assistant would achieve nothing at all.
+    /// </summary>
+    private static string Restart(Transport transport) => transport switch
+    {
+        Transport.Http => "restarting the server process",
+        _ => "restarting the client",
+    };
+
     /// <summary>The instructions for a server launched with, or without, permission to write.</summary>
-    internal static string For(bool allowWrites) =>
-        $"{What}\n\n{(allowWrites ? Writable : ReadOnly)}";
+    internal static string For(bool allowWrites, Transport transport) =>
+        allowWrites
+            ? $"{What}\n\n{Writable}"
+            : $"{What}\n\n{string.Format(null, ReadOnly, Restart(transport))}";
 }
