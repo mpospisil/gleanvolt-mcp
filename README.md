@@ -123,29 +123,58 @@ other's value. They guard two different hops:
  a client ──(1) Bearer GLEANVOLT_MCP_HTTP_TOKEN──▶ this server ──(2) Bearer GLEANVOLT_API_KEY──▶ the installation :8090
 ```
 
-| | Who checks it | What it protects |
-|---|---|---|
-| `GLEANVOLT_MCP_HTTP_TOKEN` | this server, on every request it receives | the MCP endpoint, against whoever else can reach the port |
-| `GLEANVOLT_API_KEY` | the installation | the controller's API — and it is the name that lands in the charging session |
+| | Where the value comes from | Who checks it | What it protects |
+|---|---|---|---|
+| `GLEANVOLT_MCP_HTTP_TOKEN` | **you invent it** | this server, on every request it receives | the MCP endpoint, against whoever else can reach the port |
+| `GLEANVOLT_API_KEY` | **issued by the installation** | the installation | the controller's API — and it is the name that lands in the charging session |
 
 **`GLEANVOLT_API_KEY` never leaves this process.** No client sends it and no client needs to know it:
 the server attaches it to hop 2 itself. What a client sends is hop 1, and hop 1 exists only if you
 configured a token for it.
+
+The asymmetry in that first column is the one to hold on to. `GLEANVOLT_API_KEY` has to *match*
+something — one of the installation's `Api__Keys__*` entries — so you copy it from a deployment that
+already has it. `GLEANVOLT_MCP_HTTP_TOKEN` matches nothing but itself: this server reads it from its own
+environment and compares incoming requests against that string, so there is nowhere to look it up. You
+generate one and hand it to the clients you want to let in.
+
+```bash
+openssl rand -hex 32
+```
+
+Set it **where the server runs**, never on the client machine — the client only ever carries it in a
+header. Like the write switch it is read at startup, so an existing container is replaced rather than
+restarted:
+
+```yaml
+    environment:
+      GLEANVOLT_MCP_HTTP_TOKEN: ${MCP_HTTP_TOKEN:?}     # the value from `.env`
+```
+
+```bash
+docker inspect gleanvolt-mcp --format '{{range .Config.Env}}{{println .}}{{end}}' | grep HTTP_TOKEN
+```
 
 That last point is the trap. `GLEANVOLT_MCP_HTTP_TOKEN` is optional, and when it is unset **no
 authentication middleware is registered at all** — so a client that sends the API key, or any other
 string, or no header whatsoever, is let in identically. It looks authenticated and is not. Anyone who
 can reach the port has the tools, and the charger too if writes are on.
 
-One command settles which state a running server is in. Send a token you know is wrong: `401` means it
-is being enforced, `200` means nothing is checking:
+Two requests from the client machine settle which state a running server is in, and the **wrong** one
+is the informative half — a correct token returns `200` either way, so on its own it proves nothing:
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' -X POST http://<the host>:8091/mcp \
-  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
-  -H 'Authorization: Bearer definitely-wrong' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
+INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
+
+for token in definitely-wrong "<your token>"; do
+  curl -s -o /dev/null -w "$token -> %{http_code}\n" -X POST http://<the host>:8091/mcp \
+    -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+    -H "Authorization: Bearer $token" -d "$INIT"
+done
 ```
+
+`401` then `200` is the pass. **`200` then `200` means the variable never took effect** and the
+endpoint is open to anyone who can reach the port, whatever header they send.
 
 ### Writes are opt-in
 
