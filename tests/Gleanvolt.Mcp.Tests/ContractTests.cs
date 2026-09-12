@@ -103,7 +103,7 @@ public sealed class ContractTests
     /// fill in correctly than a nested object — so nothing but this test stops the prose drifting.
     /// </summary>
     [Theory]
-    [InlineData("ChargeControlMode", "off", "solar", "forecasted", "fastNoBattery", "targeted")]
+    [InlineData("ChargeControlMode", "off", "solar", "forecasted", "fastNoBattery", "targeted", "solarGrid")]
     [InlineData("TargetedChargePriority", "cheapest", "justInTime")]
     public void TheEnumValuesInDescriptionsAreStillCurrent(string schemaName, params string[] expected)
     {
