@@ -29,7 +29,7 @@ Four more only when writes are enabled:
 
 | Tool | What it does |
 |---|---|
-| `gleanvolt_start` | Start charging in `solar`, `forecasted` or `fastNoBattery` |
+| `gleanvolt_start` | Start charging in `solar`, `forecasted`, `fastNoBattery` or `solarGrid` |
 | `gleanvolt_start_targeted` | Commit to a quoted plan |
 | `gleanvolt_stop` | Stop controlled charging |
 | `gleanvolt_set_battery_hold` | Arm or release the home battery's discharge hold |

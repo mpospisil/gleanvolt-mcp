@@ -20,14 +20,16 @@ internal static class ControlTools
         Modes: 'solar' follows live surplus once the home battery is full. 'forecasted' lets today's
         forecast decide how much of the sun the car may have, so the home battery still reaches 100% by
         its evening deadline. 'fastNoBattery' charges flat out from PV and grid with the home battery
-        held out of it, and ends itself when the car is full.
+        held out of it, and ends itself when the car is full. 'solarGrid' follows the surplus while it
+        clears the owner-set minimum, tops a surplus below the charger's 6 A floor up from the grid with
+        the home battery held out of it, and ends itself once today's forecast has no such sun left.
 
         For a targeted charge use gleanvolt_quote_plan then gleanvolt_start_targeted instead — this
         tool refuses 'targeted'. To stop, use gleanvolt_stop rather than passing 'off'.
         """)]
     internal static async Task<string> Start(
         GleanvoltClient client,
-        [Description("One of: solar, forecasted, fastNoBattery.")] string mode,
+        [Description("One of: solar, forecasted, fastNoBattery, solarGrid.")] string mode,
         [Description("For 'fastNoBattery' only: what to aim at — 'full' (charge until the car itself stops, the default), 'energy', or 'soc'.")]
         string? fastBasis = null,
         [Description("For fastBasis 'energy': the energy to deliver, measured at the charger.")]
