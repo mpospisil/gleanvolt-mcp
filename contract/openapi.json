@@ -93,7 +93,7 @@
           "Gleanvolt"
         ],
         "summary": "Whether the controller is alive and what it can see",
-        "description": "Poll this to answer 'is it working?'. It reports which installation is answering, the running build, how long ago the last poll completed, whether a forecast and a vehicle reading are in hand, and whether the two history databases can be read. It never fails for a component being down -- that is what it is reporting.",
+        "description": "Poll this to answer 'is it working?'. It reports which installation is answering, the running build, how long ago the last poll completed, whether a forecast and a vehicle reading are in hand, whether the two history databases can be read, and what protects the secrets in the data directory. It never fails for a component being down -- that is what it is reporting.",
         "operationId": "getHealth",
         "responses": {
           "200": {
@@ -343,7 +343,7 @@
           "Gleanvolt"
         ],
         "summary": "The solar forecast the controller is working from",
-        "description": "Today and tomorrow, period by period, from the cached forecast the poll loop is deciding on rather than a fresh fetch. Empty periods and null totals mean no forecast is in hand — no provider key, the provider is down, or nothing has been fetched yet — which the controller degrades around rather than failing. Pass weather=true to also fetch current conditions; that one is a live third-party call against a quota, which is why it is off by default.",
+        "description": "Today and tomorrow in full, period by period, from the cached forecast the poll loop is deciding on rather than a fresh fetch. Elapsed periods are included, so summing a day's periods gives that day's total in 'days' — every figure here comes from the same two days of retained forecast. Empty periods and null totals mean no forecast is in hand — no provider key, the provider is down, or nothing has been fetched yet — which the controller degrades around rather than failing.\n\n'days' carries each day's median, p10, p90 and peak, worked out when the forecast landed. Check 'complete' before treating a day's periods as the whole day: a provider answers only what is still to come, so a controller started at 10:44 has nothing for today before then, and 'heldFrom' says where that day's periods really begin. 'todayRemainingWh' is the one figure that is not a whole day.\n\nPass weather=true to also fetch current conditions; that one is a live third-party call against a quota, which is why it is off by default.",
         "operationId": "getForecast",
         "parameters": [
           {
@@ -744,9 +744,13 @@
           "carUnplugged",
           "serviceStopped",
           "interrupted",
+          "targetReached",
+          "departurePassed",
+          "noSunLeftToday",
+          "chargerTakenOver",
           null
         ],
-        "description": "Why a recorded charging session stopped. Set once, when the session is closed.\n\n- `modeOff`: The charge-control mode returned to Off.\n\n- `sessionComplete`: The controller ended the mode itself because the car had finished — today only FastNoBattery does this. Distinguished from ModeOff because \"the car is full\" and \"somebody switched it off\" are the two outcomes worth telling apart when reading a session back.\n\n- `carUnplugged`: The car was unplugged.\n\n- `serviceStopped`: The service shut down gracefully while the session was open.\n\n- `interrupted`: The session was still open when the service next started, so it was ended retroactively at its last recorded sample: a crash, a power cut, or a container replaced mid-session."
+        "description": "Why a recorded charging session stopped. Set once, when the session is closed. Stored by name, so members are only ever appended and a row written before a member existed still parses. A session a controller ended itself carries that controller's own reason (#198). Before that every such session was filed as SessionComplete, and rows written then cannot be told apart after the fact.\n\n- `modeOff`: The charge-control mode returned to Off: somebody switched it off.\n\n- `sessionComplete`: The car stopped drawing on its own limit while it was being asked to charge, and the mode ended itself. FastNoBattery, Targeted and SolarGrid all detect it. Distinguished from ModeOff because \"the car is full\" and \"somebody switched it off\" are the two outcomes worth telling apart when reading a session back. Sessions recorded before #198 carry this for every self-ended session, whatever ended it.\n\n- `carUnplugged`: The car was unplugged, whether the mode noticed it and ended itself or the session did.\n\n- `serviceStopped`: The service shut down gracefully while the session was open.\n\n- `interrupted`: The session was still open when the service next started, so it was ended retroactively at its last recorded sample: a crash, a power cut, or a container replaced mid-session.\n\n- `targetReached`: The energy asked for was delivered and the mode ended itself: Targeted, or FastNoBattery with an amount set.\n\n- `departurePassed`: The departure time passed before the energy asked for was delivered, and the mode ended itself: Targeted, or FastNoBattery with a departure set.\n\n- `noSunLeftToday`: SolarGrid ended itself for the day: the live surplus was under its minimum and the forecast had nothing left today that would clear it. It says nothing about the car, which may be far from full.\n\n- `chargerTakenOver`: The charger stayed out of Fast for longer than a Modbus dropout lasts, so it was no longer the mode's to drive and the mode ended itself: the wallbox went to Stop after the car finished, or its owner set another use-mode."
       },
       "ChargingSessionEventKind": {
         "enum": [
@@ -825,16 +829,6 @@
           }
         },
         "description": "What an action did, and what the controller looks like afterwards — so a caller never has to poll\nto find out whether the thing it asked for happened."
-      },
-      "DayOutlook": {
-        "enum": [
-          "unknown",
-          "surplus",
-          "tight",
-          "shortfall",
-          "noChargeToday"
-        ],
-        "description": "How the rest of today looks for the car, judged once the forecast is known. Reported to Home\nAssistant and logged, so a shortfall is announced in the morning rather than discovered at dusk\nwith a paused charger and no explanation.\n\n- `unknown`: No usable forecast yet (or it has gone stale), so no judgement can be made.\n\n- `surplus`: The forecast covers the house, the battery to 100%, and the whole EV target.\n\n- `tight`: The car gets something, but less than its daily target.\n\n- `shortfall`: The car gets substantially less than its target; the battery keeps priority.\n\n- `noChargeToday`: There is no window today in which the car could charge at all — either the sun never clears the charger's minimum power, or the battery needs everything the day produces."
       },
       "EditablePlanBody": {
         "type": "object",
@@ -1599,6 +1593,74 @@
         },
         "description": "When a deferred fast charge starts. One division and the clock — there are no blocks here and no\nforecast; see the targeted plan for those."
       },
+      "ForecastDayResponse": {
+        "required": [
+          "date",
+          "expectedWh",
+          "lowWh",
+          "highWh",
+          "peakWatts",
+          "complete",
+          "heldFrom"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The local calendar date, as the site's own time zone reckons it.",
+            "format": "date"
+          },
+          "expectedWh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "The median estimate for the whole day, in watt-hours.",
+            "format": "double"
+          },
+          "lowWh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "The p10 estimate for the day: a figure it should beat about nine times in ten. A period the provider\nsent no p10 for counts at its median, exactly as a period's own band does, so a partial response\ncannot read as darkness.",
+            "format": "double"
+          },
+          "highWh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "The p90 estimate, with the same fallback. The gap to 'lowWh' is how sure the sky is.",
+            "format": "double"
+          },
+          "peakWatts": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "The strongest half hour the median expects, in watts.",
+            "format": "double"
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "Whether the whole day is held. <b>False is ordinary, not a fault</b>: a provider answers only what\nis still to come, so a controller started at 10:44 has nothing for today before then. A caller that\nreads an incomplete day's periods as the whole day will under-report production and be wrong about\nthe day — which is why this is a field rather than something to be inferred from the first period."
+          },
+          "heldFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where the held periods for this day actually begin, or null when the whole day is held. Always the\nstart of a period, never \"now\".",
+            "format": "date-time"
+          }
+        },
+        "description": "One local calendar day of forecast, reduced to the figures a caller would otherwise have to sum\nforty-eight periods for — and to whether summing them would even be right.\n\nThe four figures are the same ones the dashboard's forecast table and the /forecast\npage show, read from the summary the source worked out when its forecast landed rather than\nrecomputed per request."
+      },
       "ForecastPeriodResponse": {
         "required": [
           "periodStart",
@@ -1664,6 +1726,7 @@
       "ForecastResponse": {
         "required": [
           "retrievedAt",
+          "days",
           "todayExpectedWh",
           "todayRemainingWh",
           "tomorrowExpectedWh",
@@ -1680,6 +1743,13 @@
             ],
             "description": "When the forecast behind this response was fetched from the provider.",
             "format": "date-time"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastDayResponse"
+            },
+            "description": "One entry per local day covered, today first — the day's own figures, and whether the whole of it is\nheld. This is where the p10 and p90 <i>day</i> totals live; the top-level `today…` fields carry\nonly the median."
           },
           "todayExpectedWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
@@ -1698,7 +1768,7 @@
               "number",
               "string"
             ],
-            "description": "Expected production from now to the end of today.",
+            "description": "Expected production from now to the end of today. Deliberately the one figure that is not a whole\nday: \"what is left\" is a different question from \"what the day was expected to bring\".",
             "format": "double"
           },
           "tomorrowExpectedWh": {
@@ -1717,7 +1787,7 @@
               "number",
               "string"
             ],
-            "description": "The highest power any period in the returned window expects.",
+            "description": "The highest power any period in the returned window expects — the strongest half hour of the two\ndays, which no longer shrinks as the day goes on.",
             "format": "double"
           },
           "periods": {
@@ -1725,7 +1795,7 @@
             "items": {
               "$ref": "#/components/schemas/ForecastPeriodResponse"
             },
-            "description": "The periods themselves, oldest first, covering today and tomorrow. Each carries the median estimate\nand, when the provider supplies them, the p10 and p90 bands."
+            "description": "The periods themselves, oldest first, covering the whole of today and tomorrow — <b>elapsed periods\nincluded</b>. Each carries the median estimate and, when the provider supplies them, the p10 and p90\nbands. Today's can begin after midnight; read 'complete' on the day before treating its periods as\nthe whole of it."
           },
           "weather": {
             "oneOf": [
@@ -1739,7 +1809,7 @@
             ]
           }
         },
-        "description": "The solar forecast for the site, as the controller is currently working from it.\n\nCached, not fetched per call: the same forecast the poll loop is deciding on, refreshed on\nits own schedule. retrievedAt says how current it is."
+        "description": "The solar forecast for the site, as the controller is currently working from it.\n\nCached, not fetched per call: the same forecast the poll loop is deciding on, refreshed on\nits own schedule. retrievedAt says how current it is.\n\nOne source, so the response agrees with itself (issue #221). Every figure here comes\nfrom the same two local days of retained forecast, which means sum(periods on a date) is\ndays[date].expectedWh and peakPowerWatts is the peak of the periods returned. It did\nnot used to be: the periods came from the live cache, which holds only what is still to come, while\nthe day totals came from the retained history, which holds the whole day — so a caller summing the\nperiods for today got a smaller number than the response's own total beside it."
       },
       "HealthResponse": {
         "required": [
@@ -1760,7 +1830,8 @@
           "vehicleAgeSeconds",
           "vehicleStale",
           "energyHistoryAvailable",
-          "sessionHistoryAvailable"
+          "sessionHistoryAvailable",
+          "secretStore"
         ],
         "type": "object",
         "properties": {
@@ -1866,6 +1937,10 @@
           "sessionHistoryAvailable": {
             "type": "boolean",
             "description": "Whether the charging-session store answered a probe query."
+          },
+          "secretStore": {
+            "type": "string",
+            "description": "What protects the secrets in the data directory (issue #215) — `owner-only files (0600) in the\ndata directory`, `Windows DPAPI, this user`. Deliberately not the word <i>encrypted</i>: the\ncontroller must come back from a restart unattended, so whatever protects a stored secret is\nundoable by this process without a person, and a claim of encryption a local root can undo is the\nsentence someone repeats when deciding where to put a backup. <b>The data directory is\nsecret-bearing whichever this says.</b>"
           }
         },
         "description": "Whether the controller is alive and what it can currently see. The endpoint to poll when the\nquestion is \"is this thing working?\" rather than \"what is the roof doing?\"."
@@ -2682,9 +2757,6 @@
           "requiredSocFloorPercent",
           "trajectorySocFloorPercent",
           "shortfallWh",
-          "evExpectedTodayWh",
-          "evTargetWh",
-          "outlook",
           "biasFactor",
           "deadline",
           "forecastAsOf",
@@ -2789,30 +2861,8 @@
               "number",
               "string"
             ],
-            "description": "How far the day falls short of filling the battery by its deadline.",
+            "description": "How far the day falls short of the house plus filling the battery by its deadline.",
             "format": "double"
-          },
-          "evExpectedTodayWh": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "description": "What the car is expected to take today.",
-            "format": "double"
-          },
-          "evTargetWh": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "description": "What the car was asked for today.",
-            "format": "double"
-          },
-          "outlook": {
-            "description": "The day's coarse character.",
-            "$ref": "#/components/schemas/DayOutlook"
           },
           "biasFactor": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",

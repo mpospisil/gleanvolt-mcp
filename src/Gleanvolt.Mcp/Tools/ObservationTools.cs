@@ -47,11 +47,18 @@ internal static class ObservationTools
 
     [McpServerTool(Name = "gleanvolt_forecast", Title = "Solar forecast", ReadOnly = true, OpenWorld = true)]
     [Description("""
-        The solar forecast the controller is planning from, as a series of expected PV power over the
-        coming period, plus the daily totals it derives.
+        The solar forecast the controller is planning from: today and tomorrow in full, period by
+        period, plus each day's own median, p10, p90 and peak in 'days'.
 
         This is the forecast the controller itself uses, not a fresh third-party lookup — so it is the
         right thing to quote when explaining why a plan was shaped the way it was.
+
+        Elapsed periods are included, so a day's periods are that whole day rather than what is left of
+        it; 'todayRemainingWh' is the figure for what is still to come. Read 'complete' on a day before
+        treating its periods as the whole of it: a provider only ever answers what is still to come, so
+        a controller started mid-morning has nothing retained for earlier that day, and 'heldFrom' says
+        where the day's periods really begin. Reporting such a day's total as the day's production
+        understates it, and the gap is the whole morning.
         """)]
     internal static Task<string> Forecast(
         GleanvoltClient client,
