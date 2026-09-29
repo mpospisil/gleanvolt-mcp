@@ -2756,6 +2756,8 @@
           "feasibleEvEnergyWh",
           "requiredSocFloorPercent",
           "trajectorySocFloorPercent",
+          "spillWh",
+          "loanHeadroomWh",
           "shortfallWh",
           "biasFactor",
           "deadline",
@@ -2853,6 +2855,24 @@
               "string"
             ],
             "description": "The same floor as a trajectory over the day rather than a single number.",
+            "format": "double"
+          },
+          "spillWh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Remaining surplus the home battery has no room for: what is coming less what it can still absorb.\nAt 100% SOC that is all of it, and every watt of it leaves the house unless the car takes it — which\nis what makes the battery loan free, and what opens the loan's thin-surplus rules.",
+            "format": "double"
+          },
+          "loanHeadroomWh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "How much the pack may lend right now for free: the room between SOC and the floor, capped by the\nspill. Zero either when SOC sits on the floor or when every remaining watt has a home in the pack.",
             "format": "double"
           },
           "shortfallWh": {
