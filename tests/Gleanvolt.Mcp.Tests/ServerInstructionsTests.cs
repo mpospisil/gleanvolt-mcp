@@ -97,4 +97,29 @@ public sealed class ServerInstructionsTests
             Assert.Contains("one Gleanvolt installation", instructions, StringComparison.Ordinal);
         }
     }
+
+    /// <summary>
+    /// The server picks a mode for the person, so the instructions turn the question round: from what
+    /// they want to the mode that does it. The trap is an amount. Forecasted used to take a session
+    /// ceiling and no longer does (gleanvolt #249); a model that still offers it one, or that does not
+    /// know targeted can be held to the sun, picks the wrong mode.
+    /// </summary>
+    [Fact]
+    public void Both_say_how_to_choose_a_mode_and_that_only_targeted_takes_an_amount()
+    {
+        foreach (var allowWrites in new[] { true, false })
+        {
+            var instructions = ServerInstructions.For(allowWrites, Transport.Stdio);
+
+            foreach (var mode in new[] { "targeted", "forecasted", "solar", "solarGrid", "fastNoBattery" })
+            {
+                Assert.Contains($"-> {mode}", instructions, StringComparison.Ordinal);
+            }
+
+            // Whitespace collapsed: the raw string wraps where it likes, the sentence is what matters.
+            var flat = System.Text.RegularExpressions.Regex.Replace(instructions, @"\s+", " ");
+            Assert.Contains("It takes NO amount", flat, StringComparison.Ordinal);
+            Assert.Contains("maxGridEnergyWh=0", instructions, StringComparison.Ordinal);
+        }
+    }
 }
