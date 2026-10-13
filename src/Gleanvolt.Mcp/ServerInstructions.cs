@@ -20,6 +20,37 @@ internal static class ServerInstructions
         and the roof above them, read over the local network. Every figure comes from that one site.
         """;
 
+    /// <summary>
+    /// How to pick a mode from what the person actually said. Keyed by intent rather than listing the
+    /// modes again: the tool descriptions say what each mode does, and a model choosing between them
+    /// needs the question turned the other way round. The one trap worth naming is an amount: only
+    /// targeted takes one, and the sun-only cap is what replaced Forecasted's session energy target
+    /// (gleanvolt #249).
+    /// </summary>
+    private const string ChoosingAMode =
+        """
+        Choosing a charging mode, from what the person wants:
+
+        - An amount (kWh or a battery %) by a time -> targeted: quote it with gleanvolt_quote_plan, then
+          gleanvolt_start_targeted. It uses the sun first and buys grid only for what the forecast cannot
+          cover. If they want sun only and will accept falling short, pass maxGridEnergyWh=0: the plan
+          is then met from the roof or not at all, and the gap is reported rather than bought. A
+          departure up to about 36 hours ahead is allowed, so "10 kWh from the sun, no rush" is a
+          targeted charge with a far departure and maxGridEnergyWh=0.
+        - Free sun, no amount, no deadline -> forecasted. It never deliberately buys grid, keeps the
+          home battery on course for 100% by the evening, and may lend from it briefly. It takes NO
+          amount: it charges until the car's own charge limit stops it, or the sun runs out. If they
+          want to stop at a level, that is the charge limit set in the car, or a targeted charge.
+        - Sun only after the home battery is full -> solar, the most conservative choice.
+        - Sun first, with a little grid to keep the car moving on thin sun -> solarGrid.
+        - As fast as possible, now -> fastNoBattery (grid allowed, home battery held out of it). It can
+          stop at an amount, and with fastDepartBy it defers the start so the car is not left full
+          overnight.
+
+        If the request does not settle it -- an amount with no time, "cheap" without saying whether a
+        shortfall is acceptable -- ask, rather than picking for them.
+        """;
+
     private const string ReadOnly =
         """
         This server is READ-ONLY. The tools that move hardware -- gleanvolt_start,
@@ -62,6 +93,6 @@ internal static class ServerInstructions
     /// <summary>The instructions for a server launched with, or without, permission to write.</summary>
     internal static string For(bool allowWrites, Transport transport) =>
         allowWrites
-            ? $"{What}\n\n{Writable}"
-            : $"{What}\n\n{string.Format(null, ReadOnly, Restart(transport))}";
+            ? $"{What}\n\n{Writable}\n\n{ChoosingAMode}"
+            : $"{What}\n\n{string.Format(null, ReadOnly, Restart(transport))}\n\n{ChoosingAMode}";
 }
