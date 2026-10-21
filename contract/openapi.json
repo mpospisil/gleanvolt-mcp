@@ -885,15 +885,15 @@
           "timeZoneId",
           "from",
           "to",
-          "solarKwh",
-          "forecastSolarKwh",
-          "gridImportKwh",
-          "gridExportKwh",
-          "evKwh",
-          "batteryChargeKwh",
-          "batteryDischargeKwh",
-          "houseLoadKwh",
-          "otherLoadsKwh",
+          "solarWh",
+          "forecastSolarWh",
+          "gridImportWh",
+          "gridExportWh",
+          "evWh",
+          "batteryChargeWh",
+          "batteryDischargeWh",
+          "houseLoadWh",
+          "otherLoadsWh",
           "socStartPercent",
           "socEndPercent",
           "socMinPercent",
@@ -922,7 +922,7 @@
             "description": "The instant it ended.",
             "format": "date-time"
           },
-          "solarKwh": {
+          "solarWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -931,7 +931,7 @@
             "description": "What the roof produced.",
             "format": "double"
           },
-          "forecastSolarKwh": {
+          "forecastSolarWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "null",
@@ -941,7 +941,7 @@
             "description": "What the forecast said it would, summed over the windows that had one.",
             "format": "double"
           },
-          "gridImportKwh": {
+          "gridImportWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -950,7 +950,7 @@
             "description": "Energy drawn from the grid.",
             "format": "double"
           },
-          "gridExportKwh": {
+          "gridExportWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -959,7 +959,7 @@
             "description": "Energy pushed to the grid.",
             "format": "double"
           },
-          "evKwh": {
+          "evWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -968,7 +968,7 @@
             "description": "Energy delivered to the car.",
             "format": "double"
           },
-          "batteryChargeKwh": {
+          "batteryChargeWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -977,7 +977,7 @@
             "description": "Energy into the home battery.",
             "format": "double"
           },
-          "batteryDischargeKwh": {
+          "batteryDischargeWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -986,7 +986,7 @@
             "description": "Energy out of the home battery.",
             "format": "double"
           },
-          "houseLoadKwh": {
+          "houseLoadWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -995,7 +995,7 @@
             "description": "Everything the house consumed, the car included.",
             "format": "double"
           },
-          "otherLoadsKwh": {
+          "otherLoadsWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1071,15 +1071,15 @@
           "periodEnd",
           "localDate",
           "timeZoneId",
-          "solarKwh",
-          "forecastSolarKwh",
-          "gridImportKwh",
-          "gridExportKwh",
-          "evKwh",
-          "batteryChargeKwh",
-          "batteryDischargeKwh",
-          "houseLoadKwh",
-          "otherLoadsKwh",
+          "solarWh",
+          "forecastSolarWh",
+          "gridImportWh",
+          "gridExportWh",
+          "evWh",
+          "batteryChargeWh",
+          "batteryDischargeWh",
+          "houseLoadWh",
+          "otherLoadsWh",
           "socStartPercent",
           "socEndPercent",
           "socMinPercent",
@@ -1109,7 +1109,7 @@
             "type": "string",
             "description": "The zone that local day was computed in."
           },
-          "solarKwh": {
+          "solarWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1118,7 +1118,7 @@
             "description": "What the roof produced.",
             "format": "double"
           },
-          "forecastSolarKwh": {
+          "forecastSolarWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "null",
@@ -1128,7 +1128,7 @@
             "description": "What the forecast said it would produce, or null when no forecast covered the window.",
             "format": "double"
           },
-          "gridImportKwh": {
+          "gridImportWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1137,7 +1137,7 @@
             "description": "Energy drawn from the grid. Export is not subtracted from it.",
             "format": "double"
           },
-          "gridExportKwh": {
+          "gridExportWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1146,7 +1146,7 @@
             "description": "Energy pushed to the grid, as a positive number.",
             "format": "double"
           },
-          "evKwh": {
+          "evWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1155,7 +1155,7 @@
             "description": "Energy delivered to the car, measured at the charger.",
             "format": "double"
           },
-          "batteryChargeKwh": {
+          "batteryChargeWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1164,7 +1164,7 @@
             "description": "Energy into the home battery.",
             "format": "double"
           },
-          "batteryDischargeKwh": {
+          "batteryDischargeWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1173,7 +1173,7 @@
             "description": "Energy out of the home battery, as a positive number.",
             "format": "double"
           },
-          "houseLoadKwh": {
+          "houseLoadWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1182,7 +1182,7 @@
             "description": "Everything the house consumed, the car included — the residual of the energy balance.",
             "format": "double"
           },
-          "otherLoadsKwh": {
+          "otherLoadsWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
@@ -1255,7 +1255,7 @@
             "format": "int32"
           }
         },
-        "description": "One window of the site's energy history — by default a quarter hour — recorded whether or not\nanything was charging.\n\nEvery figure is in kilowatt-hours over the window, and none of them are signed: import and\nexport, charge and discharge, are separate columns rather than one number that changes sign."
+        "description": "One window of the site's energy history — by default a quarter hour — recorded whether or not\nanything was charging.\n\nEvery figure is in watt-hours over the window, and none of them are signed: import and\nexport, charge and discharge, are separate columns rather than one number that changes sign."
       },
       "EnergySeriesResponse": {
         "required": [
@@ -1321,7 +1321,7 @@
           "name",
           "make",
           "model",
-          "batteryCapacityKWh",
+          "batteryCapacityWh",
           "chargeEfficiency",
           "phases",
           "minChargingCurrentAmps",
@@ -1345,13 +1345,13 @@
             "type": "string",
             "description": "The model. Reported, never acted on."
           },
-          "batteryCapacityKWh": {
+          "batteryCapacityWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
               "string"
             ],
-            "description": "Usable capacity — the figure its SOC is a percentage of. Zero when unconfigured.",
+            "description": "Usable capacity in Wh — the figure its SOC is a percentage of. Zero when unconfigured.",
             "format": "double"
           },
           "chargeEfficiency": {
@@ -1409,17 +1409,17 @@
         "type": "object",
         "properties": {
           "basis": {
-            "description": "What is being aimed at. `full` needs neither figure below; `energy` reads\nEnergyKWh; `soc` reads TargetSocPercent and needs both a\nconfigured pack capacity and a reported reading from the car.",
+            "description": "What is being aimed at. `full` needs neither figure below; `energy` reads\nEnergyWh; `soc` reads TargetSocPercent and needs both a\nconfigured pack capacity and a reported reading from the car.",
             "$ref": "#/components/schemas/FastChargeBasis"
           },
-          "energyKWh": {
+          "energyWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "null",
               "number",
               "string"
             ],
-            "description": "The energy to deliver, measured at the charger.",
+            "description": "The energy to deliver in Wh, measured at the charger.",
             "format": "double"
           },
           "targetSocPercent": {
@@ -2631,8 +2631,8 @@
           "longitude",
           "azimuthDegrees",
           "tiltDegrees",
-          "capacityKwp",
-          "inverterCapacityKw",
+          "peakPowerWatts",
+          "inverterCapacityWatts",
           "lossFactor",
           "installDate",
           "inverter",
@@ -2692,24 +2692,24 @@
             "description": "Tilt from horizontal: 0 flat, 90 vertical.",
             "format": "double"
           },
-          "capacityKwp": {
+          "peakPowerWatts": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "null",
               "number",
               "string"
             ],
-            "description": "Peak DC capacity of the array, in kWp.",
+            "description": "Peak DC power of the array (its kWp rating), in W.",
             "format": "double"
           },
-          "inverterCapacityKw": {
+          "inverterCapacityWatts": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "null",
               "number",
               "string"
             ],
-            "description": "AC-side capacity in kW, where it clips the array.",
+            "description": "AC-side capacity in W, where it clips the array.",
             "format": "double"
           },
           "lossFactor": {
@@ -3234,20 +3234,20 @@
       },
       "TargetedChargeRequestBody": {
         "required": [
-          "energyKWh",
+          "energyWh",
           "targetSocPercent",
           "departBy"
         ],
         "type": "object",
         "properties": {
-          "energyKWh": {
+          "energyWh": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "null",
               "number",
               "string"
             ],
-            "description": "The energy to deliver, measured at the charger — not the energy that reaches the cells. Omit when\nasking in state of charge.",
+            "description": "The energy to deliver in Wh, measured at the charger — not the energy that reaches the cells. Omit when\nasking in state of charge.",
             "format": "double"
           },
           "targetSocPercent": {
@@ -3257,7 +3257,7 @@
               "number",
               "string"
             ],
-            "description": "The state of charge to reach, 0-100. Converted to energy from what the car last reported. Omit when\nasking in kilowatt-hours.",
+            "description": "The state of charge to reach, 0-100. Converted to energy from what the car last reported. Omit when\nasking in energy.",
             "format": "double"
           },
           "departBy": {
@@ -3291,7 +3291,7 @@
             ]
           }
         },
-        "description": "What to put in the car, and by when. The input to both the preview and a targeted start — the same\nshape either way, so what you quote is what you commit to.\n\nSay it either as energy at the charger or as a state of charge for the car, not\nboth. A state of charge needs a vehicle feed with a reading and a configured pack size\n(Vehicle:BatteryCapacityKWh); without them, ask in kilowatt-hours. The conversion happens\nonce, when the request is made, and is never re-derived from a later reading."
+        "description": "What to put in the car, and by when. The input to both the preview and a targeted start — the same\nshape either way, so what you quote is what you commit to.\n\nSay it either as energy at the charger or as a state of charge for the car, not\nboth. A state of charge needs a vehicle feed with a reading and a configured pack size\n(Ev:Vehicles:0:BatteryCapacityKWh); without them, ask in energy. The conversion happens\nonce, when the request is made, and is never re-derived from a later reading."
       },
       "TargetedChargeSource": {
         "enum": [
@@ -3681,8 +3681,8 @@
           "ageSeconds",
           "stale",
           "socPercent",
-          "rangeKm",
-          "chargeTimeRemainingMinutes",
+          "rangeMetres",
+          "chargeTimeRemainingSeconds",
           "chargeState",
           "plugState",
           "sourceId",
@@ -3726,24 +3726,24 @@
             "description": "The drive battery's state of charge, or null when the car does not report one.",
             "format": "double"
           },
-          "rangeKm": {
+          "rangeMetres": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "null",
               "number",
               "string"
             ],
-            "description": "Electric range, or null when not reported. Display only — nothing plans on it.",
+            "description": "Electric range in metres, or null when not reported. Display only — nothing plans on it.",
             "format": "double"
           },
-          "chargeTimeRemainingMinutes": {
+          "chargeTimeRemainingSeconds": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "null",
               "number",
               "string"
             ],
-            "description": "What the car says is left of its own charge, or null when not reported.",
+            "description": "What the car says is left of its own charge, in seconds, or null when not reported.",
             "format": "double"
           },
           "chargeState": {
@@ -3763,7 +3763,7 @@
           },
           "canTargetSoc": {
             "type": "boolean",
-            "description": "Whether a targeted charge may be asked for as a state of charge: a reported SOC and a configured\npack size (`Vehicle:BatteryCapacityKWh`). False means ask in kilowatt-hours."
+            "description": "Whether a targeted charge may be asked for as a state of charge: a reported SOC and a configured\npack size (`Ev:Vehicles:0:BatteryCapacityKWh`). False means ask in energy (Wh)."
           },
           "vehicle": {
             "oneOf": [
@@ -3783,7 +3783,7 @@
         "required": [
           "observedAt",
           "temperatureCelsius",
-          "pressureHpa",
+          "pressurePascals",
           "humidityPercent",
           "cloudsPercent",
           "visibilityMetres",
@@ -3806,13 +3806,13 @@
             "description": "Air temperature.",
             "format": "double"
           },
-          "pressureHpa": {
+          "pressurePascals": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
               "string"
             ],
-            "description": "Barometric pressure.",
+            "description": "Barometric pressure at station level, in Pa.",
             "format": "double"
           },
           "humidityPercent": {

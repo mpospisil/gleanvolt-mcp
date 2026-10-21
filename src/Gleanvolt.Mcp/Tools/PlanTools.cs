@@ -20,7 +20,7 @@ internal static class PlanTools
         Always call this before gleanvolt_start_targeted, and show the person the numbers. The two take
         the same arguments, so what is quoted is exactly what would be committed.
 
-        Say the amount ONE way: either energyKWh or targetSocPercent, never both. A state-of-charge
+        Say the amount ONE way: either energyWh or targetSocPercent, never both. A state-of-charge
         target is converted using what the car last reported, so check gleanvolt_vehicle first — a
         stale reading makes a percentage target wrong by however much has happened since.
         """)]
@@ -28,9 +28,9 @@ internal static class PlanTools
         GleanvoltClient client,
         [Description("When the energy has to be in the car. ISO-8601 WITH an offset (e.g. 2026-08-28T07:30:00+02:00) — this is a local-time promise, and a bare instant is a way to be an hour wrong.")]
         string departBy,
-        [Description("The energy to deliver, measured at the charger — not what reaches the cells. Omit when asking in state of charge.")]
-        double? energyKWh = null,
-        [Description("The state of charge to reach, 0-100, converted from what the car last reported. Omit when asking in kilowatt-hours.")]
+        [Description("The energy to deliver in watt-hours (22 kWh is 22000), measured at the charger — not what reaches the cells. Omit when asking in state of charge.")]
+        double? energyWh = null,
+        [Description("The state of charge to reach, 0-100, converted from what the car last reported. Omit when asking in energy.")]
         double? targetSocPercent = null,
         [Description("'cheapest' (default) paces the charge across the whole window and takes every watt of sun above that pace, usually meeting the target well before the deadline. 'justInTime' holds the last stretch back so the car reaches its target shortly before departure instead of sitting full all night; it may cost grid, and this quote says how much.")]
         string? priority = null,
@@ -46,7 +46,7 @@ internal static class PlanTools
         client.PostAsync(
             Endpoints.QuotePlan,
             Requests.ComposeTargeted(
-                energyKWh, targetSocPercent, departBy, priority, restSocPercent,
+                energyWh, targetSocPercent, departBy, priority, restSocPercent,
                 notBefore, notAfter, maxGridEnergyWh, planId: null),
             ct);
 }

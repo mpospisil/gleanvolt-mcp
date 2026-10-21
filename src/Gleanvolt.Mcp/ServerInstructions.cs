@@ -18,6 +18,11 @@ internal static class ServerInstructions
         """
         These tools serve one Gleanvolt installation: a hybrid inverter, a home battery, an EV charger
         and the roof above them, read over the local network. Every figure comes from that one site.
+
+        Every figure is in a base unit, named in its field: power in W (...Watts), energy in Wh (...Wh),
+        durations in seconds (...Seconds), distance in metres (...Metres), pressure in Pa, percentages
+        0-100. Convert for the person -- 22000 Wh is 22 kWh, 176000 m is 176 km -- and pass amounts
+        back in the same base units.
         """;
 
     /// <summary>
