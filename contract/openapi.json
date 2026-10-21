@@ -599,6 +599,115 @@
           }
         }
       }
+    },
+    "/api/v1/tariff": {
+      "get": {
+        "tags": [
+          "Gleanvolt"
+        ],
+        "summary": "The grid tariff now and as far ahead as it is known",
+        "description": "The selected tariff strategy's low and high stretches, the rate at this moment and when it next changes, with prices per kWh in the installation's currency. An empty timeline means no tariff restriction, never 'always low': the provider is None, or the selected one cannot answer, which 'unavailable' then explains.",
+        "operationId": "getTariff",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TariffResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tariff/providers": {
+      "get": {
+        "tags": [
+          "Gleanvolt"
+        ],
+        "summary": "The tariff strategies this build has",
+        "description": "Each one is a way of knowing when the grid is cheap; 'provider' in the settings selects one by its id. None means no tariff.",
+        "operationId": "listTariffProviders",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TariffProviderResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tariff/settings": {
+      "get": {
+        "tags": [
+          "Gleanvolt"
+        ],
+        "summary": "The tariff settings as stored",
+        "description": "The selection, the shared prices, and every strategy's own settings by key, including those of a strategy that is not selected.",
+        "operationId": "getTariffSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TariffSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Gleanvolt"
+        ],
+        "summary": "Store the tariff settings, applied at once",
+        "description": "Selects a strategy and sets the shared prices, and replaces the settings of each strategy whose key is given; the others are kept. Checked by the same rules as Settings: a 400 lists every problem under 'problems', each with its field and row, and nothing is written. Warnings (a low price above the high one, no low-tariff periods) do not stop the save and come back with it. Writes no hardware; the next poll reads the new tariff.",
+        "operationId": "putTariffSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TariffSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TariffSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3636,6 +3745,306 @@
           }
         },
         "description": "The request the controller is working to, described in the terms it was asked in."
+      },
+      "TariffNowResponse": {
+        "required": [
+          "rate",
+          "pricePerKwh",
+          "until"
+        ],
+        "type": "object",
+        "properties": {
+          "rate": {
+            "description": "Which rate.",
+            "$ref": "#/components/schemas/TariffRate"
+          },
+          "pricePerKwh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "What a grid kWh costs now, or null without prices.",
+            "format": "double"
+          },
+          "until": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the rate next changes, or null when that is beyond what the strategy knows.",
+            "format": "date-time"
+          }
+        },
+        "description": "The rate at one moment."
+      },
+      "TariffProblemResponse": {
+        "required": [
+          "field",
+          "row",
+          "message",
+          "isWarning"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "What it is about: `provider`, `lowPricePerKwh`, `highPricePerKwh`, or a path into a\nstrategy's settings such as `table.weekday`."
+          },
+          "row": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "The row of a list field, counted from zero, or null.",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong, as Settings says it."
+          },
+          "isWarning": {
+            "type": "boolean",
+            "description": "True when the settings were saved regardless."
+          }
+        },
+        "description": "One thing wrong with tariff settings, where it is, and whether it stopped the save."
+      },
+      "TariffProviderResponse": {
+        "required": [
+          "id",
+          "name",
+          "selected"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "What `provider` in the settings is set to, to select it."
+          },
+          "name": {
+            "type": "string",
+            "description": "What Settings shows."
+          },
+          "selected": {
+            "type": "boolean",
+            "description": "Whether it is the one in use."
+          }
+        },
+        "description": "A tariff strategy this build has."
+      },
+      "TariffRate": {
+        "enum": [
+          "low",
+          "high"
+        ],
+        "description": "Which of a two-rate tariff's prices the grid costs at a given moment (issue #265).\n\n- `low`: The cheap rate: Czech HDO's NT.\n\n- `high`: The expensive rate, VT: every moment the table does not list as low."
+      },
+      "TariffResponse": {
+        "required": [
+          "provider",
+          "providerName",
+          "currency",
+          "unavailable",
+          "now",
+          "windows",
+          "lowPricePerKwh",
+          "highPricePerKwh"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "The selected strategy's id, as GET /tariff/providers lists them."
+          },
+          "providerName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its display name, or null when this build does not have it."
+          },
+          "currency": {
+            "type": "string",
+            "description": "What every price here is in: an ISO 4217 code, `Tariff:Currency`."
+          },
+          "unavailable": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why a selected strategy other than `None` has no timeline, or null."
+          },
+          "now": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The rate at the moment of the request, or null with no timeline.",
+                "$ref": "#/components/schemas/TariffNowResponse"
+              }
+            ]
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TariffWindowResponse"
+            },
+            "description": "Alternating low and high stretches, half-open, tiling the timeline without a gap: for the\n`Table` strategy, from the start of today to the end of tomorrow in local time."
+          },
+          "lowPricePerKwh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "The shared low-tariff price, or null when not entered.",
+            "format": "double"
+          },
+          "highPricePerKwh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "The shared high-tariff price, or null when not entered.",
+            "format": "double"
+          }
+        },
+        "description": "What grid energy costs when (issue #265): the selected tariff strategy's timeline, the rate now and\nwhen it changes. Prices are per kWh in string TariffResponse.Currency, the one figure here that is not a\nbase unit: it is money, and the installation's currency is configuration, not a conversion.\n\nNo timeline is no restriction, never \"always low\": IReadOnlyList&lt;TariffWindowResponse&gt; TariffResponse.Windows is empty and\nTariffNowResponse? TariffResponse.Now null when the provider is None, and when the selected one cannot answer,\nwhich string? TariffResponse.Unavailable then says."
+      },
+      "TariffSettingsRequest": {
+        "required": [
+          "provider",
+          "lowPricePerKwh",
+          "highPricePerKwh",
+          "settings"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "The strategy to select, by id: `None` for no tariff."
+          },
+          "lowPricePerKwh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "The low-tariff price per kWh, or null for none.",
+            "format": "double"
+          },
+          "highPricePerKwh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "The high-tariff price per kWh, or null for none.",
+            "format": "double"
+          },
+          "settings": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Strategies' own settings by key (`table` for `Table`: `weekday` and `weekend`\nlists of `{ \"start\": \"HH:mm\", \"end\": \"HH:mm\" }`, with an end of `24:00` allowed). A key\ngiven replaces that strategy's settings; one left out is kept as it is, so selecting a strategy never\ncosts another one its settings."
+          }
+        },
+        "description": "The tariff settings to store (issue #265), as Settings saves them: the selection, the shared prices,\nand strategies' own settings under their keys. Applied at once, with no restart."
+      },
+      "TariffSettingsResponse": {
+        "required": [
+          "provider",
+          "lowPricePerKwh",
+          "highPricePerKwh",
+          "settings",
+          "warnings"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "The selected strategy's id."
+          },
+          "lowPricePerKwh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "The low-tariff price per kWh, or null.",
+            "format": "double"
+          },
+          "highPricePerKwh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "The high-tariff price per kWh, or null.",
+            "format": "double"
+          },
+          "settings": {
+            "type": "object",
+            "description": "Every strategy's settings by key, including those of strategies this build lacks."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TariffProblemResponse"
+            },
+            "description": "What a save went through despite: odd, not unusable. Empty on a read."
+          }
+        },
+        "description": "The tariff settings as stored."
+      },
+      "TariffWindowResponse": {
+        "required": [
+          "start",
+          "end",
+          "rate",
+          "pricePerKwh"
+        ],
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "description": "When it begins.",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "description": "When it ends; the next window's start.",
+            "format": "date-time"
+          },
+          "rate": {
+            "description": "Which rate.",
+            "$ref": "#/components/schemas/TariffRate"
+          },
+          "pricePerKwh": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "The price throughout it: the window's own, or its rate's shared one; null without either.",
+            "format": "double"
+          }
+        },
+        "description": "One stretch of a single rate, `[start, end)`."
       },
       "TimeWindowBody": {
         "required": [
