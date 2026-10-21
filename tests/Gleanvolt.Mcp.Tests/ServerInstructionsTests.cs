@@ -122,4 +122,21 @@ public sealed class ServerInstructionsTests
             Assert.Contains("maxGridEnergyWh=0", instructions, StringComparison.Ordinal);
         }
     }
+
+    /// <summary>
+    /// The API carries base units only (gleanvolt #263), and the JSON reaches the model as it is. Without
+    /// being told, a model reads "solarWh": 22000 as 22000 kWh or asks for 22 Wh when it means 22 kWh.
+    /// </summary>
+    [Fact]
+    public void Both_say_the_figures_are_in_base_units()
+    {
+        foreach (var allowWrites in new[] { true, false })
+        {
+            var flat = System.Text.RegularExpressions.Regex.Replace(
+                ServerInstructions.For(allowWrites, Transport.Stdio), @"\s+", " ");
+
+            Assert.Contains("energy in Wh", flat, StringComparison.Ordinal);
+            Assert.Contains("22000 Wh is 22 kWh", flat, StringComparison.Ordinal);
+        }
+    }
 }

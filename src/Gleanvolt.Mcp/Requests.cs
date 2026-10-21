@@ -15,8 +15,8 @@ internal static class Requests
     /// </summary>
     internal sealed record Targeted
     {
-        [JsonPropertyName("energyKWh")]
-        public double? EnergyKWh { get; init; }
+        [JsonPropertyName("energyWh")]
+        public double? EnergyWh { get; init; }
 
         [JsonPropertyName("targetSocPercent")]
         public double? TargetSocPercent { get; init; }
@@ -64,9 +64,9 @@ internal static class Requests
         [JsonPropertyName("basis")]
         public required string Basis { get; init; }
 
-        [JsonPropertyName("energyKWh")]
+        [JsonPropertyName("energyWh")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public double? EnergyKWh { get; init; }
+        public double? EnergyWh { get; init; }
 
         [JsonPropertyName("targetSocPercent")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -105,7 +105,7 @@ internal static class Requests
     /// promise cannot disagree about what was asked for.
     /// </summary>
     internal static Targeted ComposeTargeted(
-        double? energyKWh,
+        double? energyWh,
         double? targetSocPercent,
         string departBy,
         string? priority,
@@ -119,7 +119,7 @@ internal static class Requests
 
         return new Targeted
         {
-            EnergyKWh = energyKWh,
+            EnergyWh = energyWh,
             TargetSocPercent = targetSocPercent,
             DepartBy = departBy,
             Priority = priority,

@@ -34,8 +34,8 @@ internal static class ControlTools
         [Description("One of: solar, forecasted, fastNoBattery, solarGrid.")] string mode,
         [Description("For 'fastNoBattery' only: what to aim at — 'full' (charge until the car itself stops, the default), 'energy', or 'soc'.")]
         string? fastBasis = null,
-        [Description("For fastBasis 'energy': the energy to deliver, measured at the charger.")]
-        double? fastEnergyKWh = null,
+        [Description("For fastBasis 'energy': the energy to deliver in watt-hours (20 kWh is 20000), measured at the charger.")]
+        double? fastEnergyWh = null,
         [Description("For fastBasis 'soc': the state of charge to stop at. Converted to energy once, when the mode starts, and never re-derived from a later reading.")]
         double? fastTargetSocPercent = null,
         [Description("For 'fastNoBattery': when the car has to be ready, ISO-8601 with an offset. Defers the charge to the latest moment that still finishes in time, which keeps the pack off a high state of charge overnight. Needs an amount to work back from, so it is refused with basis 'full'.")]
@@ -52,12 +52,12 @@ internal static class ControlTools
             return Refusal("'off' is not a mode to start. Call gleanvolt_stop.");
         }
 
-        var fast = fastBasis is null && fastEnergyKWh is null && fastTargetSocPercent is null && fastDepartBy is null
+        var fast = fastBasis is null && fastEnergyWh is null && fastTargetSocPercent is null && fastDepartBy is null
             ? null
             : new Requests.FastLimit
             {
                 Basis = fastBasis ?? "full",
-                EnergyKWh = fastEnergyKWh,
+                EnergyWh = fastEnergyWh,
                 TargetSocPercent = fastTargetSocPercent,
                 DepartBy = fastDepartBy,
             };
@@ -78,9 +78,9 @@ internal static class ControlTools
         GleanvoltClient client,
         [Description("When the energy has to be in the car. ISO-8601 WITH an offset — this is a local-time promise.")]
         string departBy,
-        [Description("The energy to deliver, measured at the charger. Omit when asking in state of charge.")]
-        double? energyKWh = null,
-        [Description("The state of charge to reach, 0-100. Omit when asking in kilowatt-hours.")]
+        [Description("The energy to deliver in watt-hours (22 kWh is 22000), measured at the charger. Omit when asking in state of charge.")]
+        double? energyWh = null,
+        [Description("The state of charge to reach, 0-100. Omit when asking in energy.")]
         double? targetSocPercent = null,
         [Description("'cheapest' (default) or 'justInTime'. Must match what was quoted.")]
         string? priority = null,
@@ -98,7 +98,7 @@ internal static class ControlTools
         client.PostAsync(
             Endpoints.StartTargeted,
             Requests.ComposeTargeted(
-                energyKWh, targetSocPercent, departBy, priority, restSocPercent,
+                energyWh, targetSocPercent, departBy, priority, restSocPercent,
                 notBefore, notAfter, maxGridEnergyWh, planId),
             ct);
 

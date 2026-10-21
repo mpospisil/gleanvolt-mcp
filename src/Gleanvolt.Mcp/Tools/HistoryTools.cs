@@ -16,7 +16,7 @@ internal static class HistoryTools
     [Description("""
         A whole local day added up: generation, consumption, import, export, and what went into the car.
 
-        Stated in kilowatt-hours, over the installation's own local day — not UTC — so this is the
+        Stated in watt-hours, over the installation's own local day — not UTC — so this is the
         figure that matches a bill or a "how did yesterday go" question. Prefer this over the interval
         series whenever the question is about a day rather than about a moment within one.
         """)]
@@ -28,7 +28,7 @@ internal static class HistoryTools
 
     [McpServerTool(Name = "gleanvolt_energy_intervals", Title = "Energy series", ReadOnly = true, OpenWorld = true)]
     [Description("""
-        The energy series at recording resolution, in kilowatt-hours per interval — the shape of a day
+        The energy series at recording resolution, in watt-hours per interval — the shape of a day
         rather than its total. Use it to answer "when did the export happen", not "how much was there".
 
         The window may not exceed 31 days and a longer one is refused, so ask day by day for detail and
