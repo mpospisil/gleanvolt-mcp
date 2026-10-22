@@ -14,12 +14,18 @@ namespace Gleanvolt.Mcp;
 /// </summary>
 internal static class ServerRegistration
 {
+    // IEnumerable<Type>, not Type[]: the SDK also has a generic WithTools<T>(T target), which registers
+    // the tool methods of an *instance*, and for a Type[] argument that is the better overload -- so the
+    // server registered the tools of an array, of which there are none, and answered every tools/list
+    // with "method not available". As IEnumerable<Type> the type-list overload wins the tie.
+    // ServerRegistrationTests counts what is actually registered, which is what would have caught it.
+
     /// <summary>The tool classes registered always.</summary>
-    private static readonly Type[] ReadToolTypes =
+    private static readonly IEnumerable<Type> ReadToolTypes =
         [typeof(ObservationTools), typeof(HistoryTools), typeof(PlanTools), typeof(TariffTools)];
 
     /// <summary>The tool classes registered only with <see cref="GleanvoltOptions.AllowWrites"/>.</summary>
-    private static readonly Type[] WriteToolTypes = [typeof(ControlTools), typeof(TariffControlTools)];
+    private static readonly IEnumerable<Type> WriteToolTypes = [typeof(ControlTools), typeof(TariffControlTools)];
 
     /// <summary>
     /// The tools registered always, counted from the same lists the registration uses, so the startup
