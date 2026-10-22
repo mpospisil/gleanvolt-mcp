@@ -99,6 +99,51 @@ internal static class Requests
         public required bool Hold { get; init; }
     }
 
+    /// <summary>Whether fastNoBattery and solarGrid wait for low tariff; a field left null is left as it is.</summary>
+    internal sealed record LowTariffOnly
+    {
+        [JsonPropertyName("fastNoBattery")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? FastNoBattery { get; init; }
+
+        [JsonPropertyName("solarGrid")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? SolarGrid { get; init; }
+    }
+
+    /// <summary>
+    /// The tariff settings to store: the selected provider, the shared prices, and providers' own settings
+    /// by key. A whole replacement of the selection and the prices, which is why the tool that sends it
+    /// reads the current settings first and changes only what it was given.
+    /// </summary>
+    internal sealed record TariffSettings
+    {
+        [JsonPropertyName("provider")]
+        public required string Provider { get; init; }
+
+        // Not null-ignored: the API reads an absent price as "no price", so the tool always sends what
+        // the price should be after the call, the current one included.
+        [JsonPropertyName("lowPricePerKwh")]
+        public decimal? LowPricePerKwh { get; init; }
+
+        [JsonPropertyName("highPricePerKwh")]
+        public decimal? HighPricePerKwh { get; init; }
+
+        [JsonPropertyName("settings")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public IReadOnlyDictionary<string, object>? Settings { get; init; }
+    }
+
+    /// <summary>One low-tariff period within one day, <c>HH:mm</c> to <c>HH:mm</c>; the end may be <c>24:00</c>.</summary>
+    internal sealed record TariffPeriod
+    {
+        [JsonPropertyName("start")]
+        public required string Start { get; init; }
+
+        [JsonPropertyName("end")]
+        public required string End { get; init; }
+    }
+
     /// <summary>
     /// Assembles the flat parameters the tools expose into the nested body the API takes. Kept in one
     /// place because the quote and the start must build it identically — two doors onto the same

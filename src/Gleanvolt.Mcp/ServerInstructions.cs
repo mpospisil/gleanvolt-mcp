@@ -51,6 +51,10 @@ internal static class ServerInstructions
         - As fast as possible, now -> fastNoBattery (grid allowed, home battery held out of it). It can
           stop at an amount, and with fastDepartBy it defers the start so the car is not left full
           overnight.
+        - Only on cheap grid, "at night", "in low tariff" -> fastNoBattery with low tariff only set
+          (gleanvolt_set_low_tariff_only): it waits through high tariff and charges flat out in low. Check
+          gleanvolt_tariff first: with no tariff set up the option has nothing to wait for. The same
+          option on solarGrid pauses it in high tariff, sun or not.
 
         If the request does not settle it -- an amount with no time, "cheap" without saying whether a
         shortfall is acceptable -- ask, rather than picking for them.
@@ -58,9 +62,11 @@ internal static class ServerInstructions
 
     private const string ReadOnly =
         """
-        This server is READ-ONLY. The tools that move hardware -- gleanvolt_start,
-        gleanvolt_start_targeted, gleanvolt_stop and gleanvolt_set_battery_hold -- are not registered,
-        so nothing here can start or stop a charge or arm the battery hold.
+        This server is READ-ONLY. The tools that move hardware or change how it is driven --
+        gleanvolt_start, gleanvolt_start_targeted, gleanvolt_stop, gleanvolt_set_battery_hold,
+        gleanvolt_set_low_tariff_only and gleanvolt_set_tariff -- are not registered, so nothing here
+        can start or stop a charge, arm the battery hold, or change the tariff. gleanvolt_tariff and
+        gleanvolt_tariff_settings still read it.
 
         If you are asked to do any of those, do not report that you do not know how, and do not
         improvise with the read tools. Say that this server is running read-only, and that the operator
@@ -73,7 +79,8 @@ internal static class ServerInstructions
     private const string Writable =
         """
         This server CAN move hardware: four of its tools write to a charger and an inverter attached to
-        a real car and a real house.
+        a real car and a real house, and two more -- gleanvolt_set_low_tariff_only and
+        gleanvolt_set_tariff -- change when the charger will run.
 
         Confirm with the person before calling any of them, and say which mode and why. For a targeted
         charge, quote it first with gleanvolt_quote_plan and show what it says -- the grid it expects to

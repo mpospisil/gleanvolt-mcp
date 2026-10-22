@@ -52,6 +52,8 @@ public sealed class ContractTests
     [InlineData(typeof(Requests.FastLimit), "FastChargeLimitBody")]
     [InlineData(typeof(Requests.Start), "StartChargingRequest")]
     [InlineData(typeof(Requests.BatteryHold), "BatteryHoldRequest")]
+    [InlineData(typeof(Requests.LowTariffOnly), "LowTariffOnlyRequest")]
+    [InlineData(typeof(Requests.TariffSettings), "TariffSettingsRequest")]
     public void EveryRequestFieldIsInTheSchema(Type record, string schemaName)
     {
         var declared = Contract.PropertiesOf(schemaName);
@@ -77,6 +79,7 @@ public sealed class ContractTests
     [InlineData(typeof(Requests.Targeted), "TargetedChargeRequestBody")]
     [InlineData(typeof(Requests.Start), "StartChargingRequest")]
     [InlineData(typeof(Requests.BatteryHold), "BatteryHoldRequest")]
+    [InlineData(typeof(Requests.TariffSettings), "TariffSettingsRequest")]
     public void EveryRequiredFieldIsSent(Type record, string schemaName)
     {
         var schema = Contract.Schemas.GetProperty(schemaName);

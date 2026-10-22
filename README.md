@@ -11,7 +11,7 @@ not, nothing works — which is the correct relationship between the two.
 
 ## What it exposes
 
-Nine read tools, always:
+Eleven read tools, always:
 
 | Tool | What it answers |
 |---|---|
@@ -24,8 +24,10 @@ Nine read tools, always:
 | `gleanvolt_sessions` | Charging sessions in a range |
 | `gleanvolt_session` | One session in full |
 | `gleanvolt_quote_plan` | **Quote a targeted charge without starting it** |
+| `gleanvolt_tariff` | What the grid costs now and ahead, and whether `fastNoBattery` and `solarGrid` wait for low tariff |
+| `gleanvolt_tariff_settings` | The stored tariff — the low-tariff periods and the prices — and the providers there are |
 
-Four more only when writes are enabled:
+Six more only when writes are enabled:
 
 | Tool | What it does |
 |---|---|
@@ -33,6 +35,13 @@ Four more only when writes are enabled:
 | `gleanvolt_start_targeted` | Commit to a quoted plan |
 | `gleanvolt_stop` | Stop controlled charging |
 | `gleanvolt_set_battery_hold` | Arm or release the home battery's discharge hold |
+| `gleanvolt_set_low_tariff_only` | Make `fastNoBattery` and/or `solarGrid` wait for low tariff |
+| `gleanvolt_set_tariff` | Change the tariff: the provider, the low-tariff periods, the prices — only what is passed |
+
+The two tariff writes move no hardware themselves, but they change when the charger runs, so they sit
+behind the same switch as the four that do. `gleanvolt_set_tariff` reads the stored settings first and
+changes only what it was given: the API replaces the prices on every save, so a call that only changed
+the weekend would otherwise wipe them.
 
 `gleanvolt_quote_plan` is the tool the surface is built around. A targeted charge can be priced before
 it is committed — how much sun it expects to catch, how much grid it would have to buy and when,
@@ -101,7 +110,7 @@ resolves only by luck, and when it does not, the client drops the server without
 |---|---|---|
 | `GLEANVOLT_URL` | yes | Base address of the installation, e.g. `http://gleanvolt.local:8090` — use the IP if mDNS does not resolve from the client machine |
 | `GLEANVOLT_API_KEY` | yes | One of the installation's `Api:Keys` |
-| `GLEANVOLT_MCP_ALLOW_WRITES` | no | `true` registers the four control tools. Anything else leaves this server read-only |
+| `GLEANVOLT_MCP_ALLOW_WRITES` | no | `true` registers the six control tools. Anything else leaves this server read-only |
 | `GLEANVOLT_MCP_TRANSPORT` | no | `stdio` (the default) or `http`. See [Serving it over HTTP](#serving-it-over-http) |
 | `GLEANVOLT_MCP_HTTP_URL` | no | HTTP mode only. What to bind, default `http://0.0.0.0:8091` |
 | `GLEANVOLT_MCP_HTTP_TOKEN` | no | HTTP mode only. A bearer token every request must present. Unset leaves the endpoint open |
@@ -149,7 +158,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://<the host>:8091/mcp \
 
 ### Writes are opt-in
 
-Four of these tools move real hardware. Left alone, they are not registered at all — the model is not
+Four of these tools move real hardware, and two more change when it runs. Left alone, none of the six is registered — the model is not
 told they exist, which is a better answer than a tool that always refuses. Enable them deliberately,
 per client, and only where a person is watching the conversation.
 
@@ -179,11 +188,11 @@ lands in the charging session as the source of the action.
 To confirm which mode it came up in, read the server's first line on stderr:
 
 ```
-Gleanvolt MCP 1.0.0 (31bf347) serving http://gleanvolt.local:8090/ as 13 tools over stdio; writes are ENABLED.
+Gleanvolt MCP 1.0.0 (31bf347) serving http://gleanvolt.local:8090/ as 17 tools over stdio; writes are ENABLED.
 ```
 
-Nine tools and `disabled` means the variable never reached the process. From the client side, `/mcp`
-in Claude Code lists the tools it was actually given: the four control tools are there or they are not.
+Eleven tools and `disabled` means the variable never reached the process. From the client side, `/mcp`
+in Claude Code lists the tools it was actually given: the six control tools are there or they are not.
 
 A read-only server also says so in its own words. The `instructions` it sends at initialize name this
 variable, so a model asked to start a charge it has no tool for reports what is actually wrong and who
@@ -317,20 +326,20 @@ docker compose up -d gleanvolt-mcp   # recreates it, because the environment cha
 ```
 
 `docker restart` is the one that looks like it worked and did not: same container, same process
-arguments, same nine tools.
+arguments, same eleven tools.
 
-Confirm it on the first line of the log rather than by trying a control tool — thirteen and `ENABLED`,
-where a read-only server says nine and `disabled`:
+Confirm it on the first line of the log rather than by trying a control tool — seventeen and `ENABLED`,
+where a read-only server says eleven and `disabled`:
 
 ```
-Gleanvolt MCP 1.0.0 (31bf347) serving http://gleanvolt.local:8090/ as 13 tools at http://0.0.0.0:8091/mcp; writes are ENABLED.
+Gleanvolt MCP 1.0.0 (31bf347) serving http://gleanvolt.local:8090/ as 17 tools at http://0.0.0.0:8091/mcp; writes are ENABLED.
 ```
 
 ```bash
 docker logs gleanvolt-mcp | head -2
 ```
 
-Nine tools and `disabled` means the variable never reached the process — under Compose that is usually
+Eleven tools and `disabled` means the variable never reached the process — under Compose that is usually
 an `.env` in a different directory from the one `docker compose` was run in. The value is matched
 against `true` case-insensitively and nothing else: `1`, `yes` and `on` all leave the server read-only,
 deliberately, because a typo should leave the hardware alone.
@@ -338,7 +347,7 @@ deliberately, because a typo should leave the hardware alone.
 Two things worth settling before this is a permanent part of the stack. Give the server **its own API
 key** on the installation — every write lands in the charging session under that key's name, and
 `Api__Keys__claude-mcp` is the difference between *"API (claude-mcp) started Targeted"* and an
-anonymous entry. And decide whether Home Assistant should have it: the four control tools become
+anonymous entry. And decide whether Home Assistant should have it: the six control tools become
 available to whichever conversation agent holds the MCP integration's tools, which is a voice assistant
 acting without a person necessarily reading the reply. Running two containers — one read-only for Home
 Assistant, one with writes for Claude Code, two keys, two ports — is the honest way to have both.
@@ -519,7 +528,7 @@ claude mcp add --transport http gleanvolt http://raspberrypi.local:8091/mcp \
 Again, that is `GLEANVOLT_MCP_HTTP_TOKEN` and not the installation's API key — two different secrets,
 guarding two different hops ([Two secrets, not one](#two-secrets-not-one)).
 
-`/mcp` in Claude Code then lists what it was actually given — nine tools, or thirteen if you enabled
+`/mcp` in Claude Code then lists what it was actually given — eleven tools, or seventeen if you enabled
 writes on the container.
 
 **On the address.** `raspberrypi.local` is mDNS and resolves from most desktops but not from every
