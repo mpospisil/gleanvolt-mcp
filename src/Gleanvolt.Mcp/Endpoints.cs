@@ -36,6 +36,14 @@ internal static class Endpoints
 
     internal const string BatteryHold = "/api/v1/battery-hold";
 
+    internal const string LowTariffOnly = "/api/v1/charging/low-tariff-only";
+
+    internal const string Tariff = "/api/v1/tariff";
+
+    internal const string TariffProviders = "/api/v1/tariff/providers";
+
+    internal const string TariffSettings = "/api/v1/tariff/settings";
+
     /// <summary>
     /// Every route above with the verb it is called by — the list the contract test walks. Adding a
     /// tool means adding its route here, which is the point: the guard cannot be forgotten silently.
@@ -56,6 +64,12 @@ internal static class Endpoints
         ("post", StartTargeted),
         ("post", Stop),
         ("put", BatteryHold),
+        ("get", LowTariffOnly),
+        ("put", LowTariffOnly),
+        ("get", Tariff),
+        ("get", TariffProviders),
+        ("get", TariffSettings),
+        ("put", TariffSettings),
     ];
 
     /// <summary>Substitutes a single path segment, escaped.</summary>

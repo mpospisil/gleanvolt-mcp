@@ -139,4 +139,27 @@ public sealed class ServerInstructionsTests
             Assert.Contains("22000 Wh is 22 kWh", flat, StringComparison.Ordinal);
         }
     }
+
+    [Fact]
+    public void A_read_only_server_names_the_tariff_tools_it_does_not_have()
+    {
+        var instructions = ServerInstructions.For(allowWrites: false, Transport.Http);
+
+        Assert.Contains("gleanvolt_set_low_tariff_only", instructions, StringComparison.Ordinal);
+        Assert.Contains("gleanvolt_set_tariff", instructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Low_tariff_charging_is_steered_to_the_option_and_to_checking_a_tariff_exists()
+    {
+        foreach (var allowWrites in new[] { true, false })
+        {
+            var instructions = ServerInstructions.For(allowWrites, Transport.Http);
+
+            var flat = System.Text.RegularExpressions.Regex.Replace(instructions, @"\s+", " ");
+
+            Assert.Contains("fastNoBattery with low tariff only set", flat, StringComparison.Ordinal);
+            Assert.Contains("Check gleanvolt_tariff first", flat, StringComparison.Ordinal);
+        }
+    }
 }

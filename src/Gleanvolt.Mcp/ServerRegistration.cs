@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
+using System.Reflection;
 using Gleanvolt.Mcp.Tools;
+using ModelContextProtocol.Server;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Gleanvolt.Mcp;
@@ -12,11 +14,22 @@ namespace Gleanvolt.Mcp;
 /// </summary>
 internal static class ServerRegistration
 {
-    /// <summary>Registered always. Kept here so the startup log cannot drift from the truth.</summary>
-    internal const int ReadTools = 9;
+    /// <summary>The tool classes registered always.</summary>
+    private static readonly Type[] ReadToolTypes =
+        [typeof(ObservationTools), typeof(HistoryTools), typeof(PlanTools), typeof(TariffTools)];
+
+    /// <summary>The tool classes registered only with <see cref="GleanvoltOptions.AllowWrites"/>.</summary>
+    private static readonly Type[] WriteToolTypes = [typeof(ControlTools), typeof(TariffControlTools)];
+
+    /// <summary>
+    /// The tools registered always, counted from the same lists the registration uses, so the startup
+    /// log cannot drift from the truth. It did when this was a constant: two tools were added and the
+    /// log went on saying the old number.
+    /// </summary>
+    internal static int ReadTools => Count(ReadToolTypes);
 
     /// <summary>Registered only with <see cref="GleanvoltOptions.AllowWrites"/>.</summary>
-    internal const int WriteTools = 4;
+    internal static int WriteTools => Count(WriteToolTypes);
 
     internal static int ToolCount(bool allowWrites) => allowWrites ? ReadTools + WriteTools : ReadTools;
 
@@ -54,15 +67,20 @@ internal static class ServerRegistration
             })
             // The type-list overload rather than WithTools<T>(): these tool classes are static, and a static
             // type cannot be a type argument.
-            .WithTools([typeof(ObservationTools), typeof(HistoryTools), typeof(PlanTools)]);
+            .WithTools(ReadToolTypes);
 
         // Registered rather than refused: a read-only server should not advertise a control surface it will
         // not use. The tool list itself is the switch.
         if (options.AllowWrites)
         {
-            mcp.WithTools([typeof(ControlTools)]);
+            mcp.WithTools(WriteToolTypes);
         }
 
         return mcp;
     }
+
+    private static int Count(IEnumerable<Type> types) =>
+        types.Sum(type => type
+            .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            .Count(method => method.GetCustomAttribute<McpServerToolAttribute>() is not null));
 }
