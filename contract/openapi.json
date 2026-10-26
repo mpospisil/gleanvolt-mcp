@@ -652,6 +652,58 @@
         }
       }
     },
+    "/api/v1/charging/until-full": {
+      "get": {
+        "tags": [
+          "Gleanvolt"
+        ],
+        "summary": "Whether forecasted runs until the car is full",
+        "description": "The owner's 'until full' option for forecasted, and the session running with it: since when, and which day of it this is.",
+        "operationId": "getUntilFull",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UntilFullResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Gleanvolt"
+        ],
+        "summary": "Make forecasted run until the car is full",
+        "description": "With it on, one forecasted session runs over several days: by day nothing changes, and where the mode would end for the day it stands the charger down for the night instead and starts again on the next day's sun. It ends when the car is full, is unplugged, the charger is taken over, or charging is stopped. A session running with it on is resumed after a restart. Starts nothing itself; applies from the next poll, to a running session too.",
+        "operationId": "setUntilFull",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UntilFullRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UntilFullResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tariff": {
       "get": {
         "tags": [
@@ -924,9 +976,11 @@
           "batteryHoldReleased",
           "planUnusable",
           "planUsable",
-          "sessionEnded"
+          "sessionEnded",
+          "chargerStoodDown",
+          "chargerRearmed"
         ],
-        "description": "The sparse, human-readable things that happen inside a session. Samples say what the numbers were;\nevents say what changed and why, which is what makes a session chart legible rather than a set of\nunexplained steps.\n\n- `sessionStarted`: The session opened.\n\n- `modeChanged`: The charge-control mode changed without the session ending (e.g. Forecasted → FastNoBattery).\n\n- `chargingStarted`: Control state moved to Charging.\n\n- `chargingPaused`: Control state moved to Paused.\n\n- `targetCurrentChanged`: The commanded current setpoint changed.\n\n- `batteryHoldArmed`: The battery discharge hold was armed.\n\n- `batteryHoldReleased`: The battery discharge hold was released.\n\n- `planUnusable`: The forecast-driven day plan became unusable (no forecast, stale, or out of the trust band).\n\n- `planUsable`: A usable day plan became available again.\n\n- `sessionEnded`: The session closed."
+        "description": "The sparse, human-readable things that happen inside a session. Samples say what the numbers were;\nevents say what changed and why, which is what makes a session chart legible rather than a set of\nunexplained steps.\n\n- `sessionStarted`: The session opened.\n\n- `modeChanged`: The charge-control mode changed without the session ending (e.g. Forecasted → FastNoBattery).\n\n- `chargingStarted`: Control state moved to Charging.\n\n- `chargingPaused`: Control state moved to Paused.\n\n- `targetCurrentChanged`: The commanded current setpoint changed.\n\n- `batteryHoldArmed`: The battery discharge hold was armed.\n\n- `batteryHoldReleased`: The battery discharge hold was released.\n\n- `planUnusable`: The forecast-driven day plan became unusable (no forecast, stale, or out of the trust band).\n\n- `planUsable`: A usable day plan became available again.\n\n- `sessionEnded`: The session closed.\n\n- `chargerStoodDown`: The mode put the charger in Stop for a wait, rather than holding it in Fast at 0 A (#280).\n\n- `chargerRearmed`: The mode switched a stood-down charger back to Fast to charge."
       },
       "ControlActionResponse": {
         "required": [
@@ -3418,6 +3472,17 @@
                 "$ref": "#/components/schemas/LowTariffStatusResponse"
               }
             ]
+          },
+          "untilFull": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "A `forecasted` session running <i>until full</i> (issue #279): since when, and which day of it this\nis. Null while another mode drives, or the option is off.",
+                "$ref": "#/components/schemas/UntilFullStatusResponse"
+              }
+            ]
           }
         },
         "description": "What the controller is doing right now: one poll's worth of the whole site, as the control loop\nlast read it.\n\nEvery power is instantaneous and in watts, signed the way the hardware reports it, and every\nenergy is in watt-hours. timestamp is when the poll behind these figures completed — check\nit before drawing conclusions from anything else here."
@@ -4198,6 +4263,68 @@
           }
         },
         "description": "A stretch of time the charger must stay idle in, `[start, end)`."
+      },
+      "UntilFullRequest": {
+        "required": [
+          "untilFull"
+        ],
+        "type": "object",
+        "properties": {
+          "untilFull": {
+            "type": "boolean",
+            "description": "Whether `forecasted` runs until the car is full rather than ending with the day's sun."
+          }
+        },
+        "description": "Change <i>until full</i> for `forecasted` (issue #279): with it on, one session runs over several\ndays, stood down at night, until the car is full, it is unplugged, or the mode is stopped."
+      },
+      "UntilFullResponse": {
+        "required": [
+          "untilFull",
+          "session"
+        ],
+        "type": "object",
+        "properties": {
+          "untilFull": {
+            "type": "boolean",
+            "description": "Whether `forecasted` runs until the car is full."
+          },
+          "session": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The `forecasted` session running with it; null when there is none.",
+                "$ref": "#/components/schemas/UntilFullStatusResponse"
+              }
+            ]
+          }
+        },
+        "description": "<i>Until full</i> as the controller is using it, and the session running with it, if any."
+      },
+      "UntilFullStatusResponse": {
+        "required": [
+          "since",
+          "day"
+        ],
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "string",
+            "description": "When the session started. A restart resumes it and keeps this.",
+            "format": "date-time"
+          },
+          "day": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Which local day of the session this is, from 1 on the day it was started.",
+            "format": "int32"
+          }
+        },
+        "description": "A `forecasted` session running <i>until full</i>: one session over several days."
       },
       "VehicleChargeState": {
         "enum": [
