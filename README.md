@@ -662,8 +662,8 @@ dotnet test
   near-identical names and it picks wrong. `gleanvolt_overview` folds two calls together because a
   state of charge means little without the pack size.
 - **Parameters are flat, not nested.** The API's targeted request has a nested `editable` object; the
-  tools take `notBefore`, `notAfter` and `maxGridEnergyWh` directly, because a model fills flat
-  arguments in correctly far more often than nested ones. `forbiddenWindows` is not exposed for the
+  tools take `notBefore`, `notAfter`, `maxGridEnergyWh` and `lowTariffOnly` directly, because a model
+  fills flat arguments in correctly far more often than nested ones. `forbiddenWindows` is not exposed for the
   same reason — a list of objects is where flat stops working, and it can be added when something
   actually needs it.
 - **Responses are passed through as the API's own JSON.** The model reads JSON; a local DTO for every
