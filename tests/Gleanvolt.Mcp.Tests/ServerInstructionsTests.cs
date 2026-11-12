@@ -120,6 +120,7 @@ public sealed class ServerInstructionsTests
             var flat = System.Text.RegularExpressions.Regex.Replace(instructions, @"\s+", " ");
             Assert.Contains("It takes NO amount", flat, StringComparison.Ordinal);
             Assert.Contains("maxGridEnergyWh=0", instructions, StringComparison.Ordinal);
+            Assert.Contains("lowTariffOnly=true", instructions, StringComparison.Ordinal);
         }
     }
 
