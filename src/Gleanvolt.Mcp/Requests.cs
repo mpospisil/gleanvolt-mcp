@@ -56,6 +56,12 @@ internal static class Requests
         [JsonPropertyName("maxGridEnergyWh")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public double? MaxGridEnergyWh { get; init; }
+
+        // Sent only when asked for: false is the controller's default, and leaving it out keeps a
+        // request that narrows nothing looking exactly like one that never said (gleanvolt #382).
+        [JsonPropertyName("lowTariffOnly")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? LowTariffOnly { get; init; }
     }
 
     /// <summary>How much a fast charge delivers before it stops.</summary>
@@ -158,9 +164,11 @@ internal static class Requests
         string? notBefore,
         string? notAfter,
         double? maxGridEnergyWh,
+        bool? lowTariffOnly,
         string? planId)
     {
-        var hasLimits = notBefore is not null || notAfter is not null || maxGridEnergyWh is not null || planId is not null;
+        var lowTariff = lowTariffOnly == true ? true : (bool?)null;
+        var hasLimits = notBefore is not null || notAfter is not null || maxGridEnergyWh is not null || lowTariff is not null || planId is not null;
 
         return new Targeted
         {
@@ -176,6 +184,7 @@ internal static class Requests
                     NotBefore = notBefore,
                     NotAfter = notAfter,
                     MaxGridEnergyWh = maxGridEnergyWh,
+                    LowTariffOnly = lowTariff,
                 }
                 : null,
         };

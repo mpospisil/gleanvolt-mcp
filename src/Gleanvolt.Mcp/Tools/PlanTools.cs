@@ -42,11 +42,13 @@ internal static class PlanTools
         string? notAfter = null,
         [Description("The most that may be bought over the whole plan, in watt-hours. Zero is a real value and means sun only: the request is met from the roof or not at all, and the rest is reported as shortfall rather than quietly imported.")]
         double? maxGridEnergyWh = null,
+        [Description("true to charge in low tariff only: the charger waits through every high-tariff stretch of the tariff set up on the installation, sun or not, and the plan counts only on low-tariff hours, reporting what does not fit as shortfall. Check gleanvolt_tariff first: with no tariff set up it is ignored. Meaningless with maxGridEnergyWh=0 (sun only), which wins if both are sent.")]
+        bool? lowTariffOnly = null,
         CancellationToken ct = default) =>
         client.PostAsync(
             Endpoints.QuotePlan,
             Requests.ComposeTargeted(
                 energyWh, targetSocPercent, departBy, priority, restSocPercent,
-                notBefore, notAfter, maxGridEnergyWh, planId: null),
+                notBefore, notAfter, maxGridEnergyWh, lowTariffOnly, planId: null),
             ct);
 }

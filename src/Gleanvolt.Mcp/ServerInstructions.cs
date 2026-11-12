@@ -54,7 +54,9 @@ internal static class ServerInstructions
         - Only on cheap grid, "at night", "in low tariff" -> fastNoBattery with low tariff only set
           (gleanvolt_set_low_tariff_only): it waits through high tariff and charges flat out in low. Check
           gleanvolt_tariff first: with no tariff set up the option has nothing to wait for. The same
-          option on solarGrid pauses it in high tariff, sun or not.
+          option on solarGrid pauses it in high tariff, sun or not. For an amount by a time in low tariff
+          only, use targeted with lowTariffOnly=true instead: it waits the same way, and the quote says
+          what does not fit in the low-tariff hours before the departure.
 
         If the request does not settle it -- an amount with no time, "cheap" without saying whether a
         shortfall is acceptable -- ask, rather than picking for them.

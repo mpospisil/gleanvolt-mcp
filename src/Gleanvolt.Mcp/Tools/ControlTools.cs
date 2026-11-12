@@ -92,6 +92,8 @@ internal static class ControlTools
         string? notAfter = null,
         [Description("The most that may be bought over the whole plan, in watt-hours. Zero means sun only.")]
         double? maxGridEnergyWh = null,
+        [Description("true to charge in low tariff only: waits through high tariff, sun or not. Must match what was quoted.")]
+        bool? lowTariffOnly = null,
         [Description("The planId from the quote this is committing to. Advisory: the response reports whether the forecast has moved since, and a start never fails because of it.")]
         string? planId = null,
         CancellationToken ct = default) =>
@@ -99,7 +101,7 @@ internal static class ControlTools
             Endpoints.StartTargeted,
             Requests.ComposeTargeted(
                 energyWh, targetSocPercent, departBy, priority, restSocPercent,
-                notBefore, notAfter, maxGridEnergyWh, planId),
+                notBefore, notAfter, maxGridEnergyWh, lowTariffOnly, planId),
             ct);
 
     [McpServerTool(Name = "gleanvolt_stop", Title = "Stop controlled charging", Destructive = true, Idempotent = true, OpenWorld = true)]

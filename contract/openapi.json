@@ -1090,6 +1090,11 @@
             ],
             "description": "The most that may be bought over the whole plan. Null for no cap. <b>Zero is a real value</b> and\nmeans sun only: the request is met from the roof or not at all, and the rest is reported as\nshortfall rather than quietly imported.",
             "format": "double"
+          },
+          "lowTariffOnly": {
+            "type": "boolean",
+            "description": "Charge in low tariff only: the charger waits through every high-tariff stretch of the tariff\nselected on Settings, sun or not, and the plan counts only on low-tariff hours. Ignored when no\ntariff is selected. Sent together with sun only (MaxGridEnergyWh 0), sun only\nwins and this comes back false.",
+            "default": false
           }
         },
         "description": "What a caller may change about a quoted plan (issue #128), and the whole of it.\n\nLimits, not a schedule — and the distinction is the feature, not a simplification of\nit. The plan is rebuilt on every poll from a refreshed forecast and the measured delivery, which is\nwhat lets a sunnier afternoon than forecast shrink the grid block before any of it is bought. Hand\nback a list of blocks to replay and that stops happening; worse, the blocks go on being executed\nagainst a delivered-energy figure that stopped being true the moment they were quoted. So what you\nedit are the bounds, and the planner keeps planning inside them.\n\nEvery field is optional and every one of them can only ever narrow the plan. Sending\nnone of them is the same as not sending this at all."
@@ -1528,7 +1533,7 @@
           "stopping",
           "unknown"
         ],
-        "description": "What the EV charger reports it is doing. Values match the SolaX charger's RunMode/EVSE_State\nregister (0-13) exactly, so mapping is a direct cast rather than a lookup table.\n\nRead carefully rather than at face value: three of these look like \"the car is done\" and only\none of them means it — see bool EvChargerStatusExtensions.IsCarKnownDisconnected(EvChargerStatus status) and the\nmembers below.\n\n- `available`: Ready, with no car plugged in.\n\n- `preparing`: A car is plugged in and the two are still negotiating; no energy is flowing yet.\n\n- `charging`: Delivering energy to the car.\n\n- `finishing`: The session is closing. The car's own doing, so it counts as the car having finished.\n\n- `faulted`: The charger reports a fault.\n\n- `unavailable`: The charger is out of service.\n\n- `reserved`: Reserved for a specific user or session.\n\n- `suspendedEv`: The car has stopped drawing, typically because it reached its own charge limit. The car's decision, so it counts as finished.\n\n- `suspendedEvse`: The charger has stopped delivering. Deliberately not treated as a finished charge: this is what our own pause write produces, and mistaking it for one would let the controller read its own pause as the car being full.\n\n- `update`: The charger is updating its firmware.\n\n- `cardActivation`: Waiting for an RFID card to authorise the session.\n\n- `startDelay`: Waiting on a start delay — the charger's own timer, not ours.\n\n- `chargePaused`: Charging is paused at the charger. Excluded from \"the car is done\" for the same reason as SuspendedEvse: it is the charger's doing, and usually ours.\n\n- `stopping`: The session is stopping.\n\n- `unknown`: The charger did not answer, or answered with a value outside the register's range. The absence of information, not a fact about the car — a dropped Modbus read must never be read as an unplugged car."
+        "description": "What the EV charger reports it is doing, in OCPP 1.6's status names. Each charger driver maps its own\nfamily's state onto these (issue #348). The values happen to match the SolaX charger's RunMode\nregister (0-13), which follows the same names, so its driver maps by a cast.\n\nRead carefully rather than at face value: three of these look like \"the car is done\" and only\none of them means it — see EvChargerStatusExtensions.IsCarKnownDisconnected in Core and the\nmembers below."
       },
       "EvResponse": {
         "required": [
@@ -2880,7 +2885,7 @@
           },
           "model": {
             "type": "string",
-            "description": "What the box is. <b>Reported, not acted on:</b> the register maps are compiled for the devices in the\nREADME's hardware targets and are chosen by nothing, so this says what the operator believes is on\nthe other end of the address, not what the controller is speaking."
+            "description": "What the box is. <b>Reported, not acted on:</b> what the controller speaks to the inverter is chosen by\nthe site's `InverterDriver`, so this says what the operator believes is on the other end of the\naddress, not what the controller is speaking."
           },
           "host": {
             "type": "string",
@@ -2921,7 +2926,9 @@
           "lossFactor",
           "installDate",
           "inverter",
-          "chargers"
+          "chargers",
+          "inverterDriver",
+          "chargerDriver"
         ],
         "type": "object",
         "properties": {
@@ -3025,6 +3032,14 @@
               "$ref": "#/components/schemas/SiteDeviceResponse"
             },
             "description": "The EV chargers. Exactly one is supported today; it is a list because that will not always be true."
+          },
+          "inverterDriver": {
+            "type": "string",
+            "description": "The driver that reads and controls the inverter (`Pv:Inverter:Driver`): `solax` or `huawei`."
+          },
+          "chargerDriver": {
+            "type": "string",
+            "description": "The driver that reads and controls the charger Gleanvolt drives (`Pv:Chargers:0:Driver`): `solax`,\nthe only one so far. Empty when no charger is configured."
           }
         },
         "description": "The installation this API speaks for (issue #111): which system, where it is, what the array does,\nand which boxes it is made of.\n\nThe first question a program should be able to ask — an MCP client above all — is what am I\nconnected to. Every other endpoint answers what it is doing, and a caller that cannot tell\ntwo installations apart cannot safely act on either.\n\nEvery measurement is nullable and null means unset, never zero: a defaulted site is a\nsite in the Atlantic facing north with no capacity, and a client that cannot tell \"not configured\"\nfrom \"zero\" will draw exactly that conclusion."
